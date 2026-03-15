@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grafo UPL + Barrios — Seguridad Bogotá</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{ffont-family:'Segoe UI',system-ui,sans-serif;background:#0D1117;color:#E6EDF3;
+     display:flex;flex-direction:column;min-height:100vh;overflow:auto}
+#top{padding:8px 14px;border-bottom:1px solid #21262D;display:flex;align-items:center;
+      gap:10px;flex-wrap:wrap;flex-shrink:0;background:#0D1117}
+#top h1{font-size:13px;font-weight:600;color:#F0F6FF;white-space:nowrap}
+#top p{font-size:10px;color:#8B949E;margin-top:1px}
+select,button.tb{font-size:11px;padding:3px 7px;border-radius:6px;
+    border:1px solid #30363D;background:#161B22;color:#E6EDF3;cursor:pointer}
+button.tb{transition:background .15s} button.tb:hover{background:#2D333B}
+button.tb.active{background:#1F3A5F;border-color:#1F6FEB;color:#79C0FF}
+#main{display:flex;flex:1;min-height:0}
+#cw{flex:1;position:relative;min-width:0}
+canvas{display:block;width:100%;height:100%;cursor:crosshair}
+canvas.hover{cursor:pointer}
+#tt{position:absolute;background:#161B22;border:1px solid #30363D;border-radius:6px;
+     padding:5px 10px;font-size:11px;pointer-events:none;display:none;z-index:9;white-space:nowrap;color:#E6EDF3}
+#panel{width:290px;flex-shrink:0;border-left:1px solid #21262D;background:#161B22;
+        display:flex;flex-direction:column;overflow-y:auto}
+.ph{padding:9px 13px;border-bottom:1px solid #21262D;font-size:10px;font-weight:600;
+     color:#8B949E;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0}
+.pb{padding:12px;flex:1;overflow-y:auto}
+.empty{color:#484F58;font-size:12px;line-height:1.7}
+.ntitle{font-size:15px;font-weight:600;color:#F0F6FF;line-height:1.3}
+.nsub{font-size:11px;color:#8B949E;margin-top:2px;line-height:1.5}
+.badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.badge{font-size:10px;font-weight:500;padding:2px 8px;border-radius:99px}
+.br{background:#3D1B1B;color:#F48A8A} .ba{background:#2D1F0A;color:#F0A854}
+.bg{background:#0D2611;color:#56D364} .bp{background:#1E1B3A;color:#A78BFA}
+.bt{background:#0A1F2D;color:#79C0FF}
+.sec{margin-top:13px}
+.st{font-size:10px;font-weight:600;color:#8B949E;text-transform:uppercase;
+     letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.sr{display:flex;justify-content:space-between;align-items:center;padding:3px 0;
+     border-bottom:1px solid #161B22;font-size:11px}
+.sr:last-child{border:none}
+.sl{color:#8B949E} .sv{font-weight:500;color:#E6EDF3}
+.bar{height:4px;background:#21262D;border-radius:2px;overflow:hidden;margin-top:2px}
+.bf{height:100%;border-radius:2px;transition:width .4s ease}
+.btab{margin-top:13px}
+.btitle{font-size:10px;font-weight:600;color:#8B949E;text-transform:uppercase;
+         letter-spacing:.06em;margin-bottom:6px}
+.bcard{background:#0D1117;border:1px solid #21262D;border-radius:6px;padding:7px 10px;
+        margin-bottom:5px;cursor:pointer;transition:border-color .15s}
+.bcard:hover{border-color:#30363D}
+.bcard-name{font-size:11px;font-weight:500;color:#E6EDF3}
+.bcard-sub{font-size:10px;color:#8B949E;margin-top:1px}
+.bbar{height:3px;background:#21262D;border-radius:2px;overflow:hidden;margin-top:5px}
+.bbf{height:100%;border-radius:2px}
+.leg{padding:10px 13px;border-top:1px solid #21262D;flex-shrink:0}
+.lt{font-size:10px;font-weight:600;color:#8B949E;text-transform:uppercase;
+     letter-spacing:.06em;margin-bottom:6px}
+.lr{display:flex;align-items:center;gap:5px;font-size:10px;color:#8B949E;margin-top:3px}
+.ld{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ll{width:18px;height:2px;border-radius:1px;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="top">
+  <div><h1>Red de seguridad UPL — Bogotá</h1>
+  <p>~30 Unidades de Planeamiento Local · clic = barrios detallados</p></div>
+  <div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:8px">
+    <button class="tb active" onclick="setView('score',this)">Global</button>
+    <button class="tb" onclick="setView('mujer',this)">Mujeres</button>
+    <button class="tb" onclick="setView('hombre',this)">Hombres</button>
+    <button class="tb" onclick="setView('brecha',this)">Brecha</button>
+    <button class="tb" onclick="setView('inseg',this)">Victimización</button>
+    <button class="tb" onclick="setView('sat_transp',this)">Transporte</button>
+  </div>
+  <div style="display:flex;gap:5px;flex-wrap:wrap">
+    <select id="esel" onchange="emode=this.value;draw()">
+      <option value="vecino">Vecindad geográfica</option>
+      <option value="sim">Similitud de perfil</option>
+      <option value="brecha">Brecha de género</option>
+      <option value="transp">Misma localidad</option>
+    </select>
+  </div>
+  <label style="font-size:11px;color:#8B949E;display:flex;align-items:center;gap:4px">
+    <input type="checkbox" id="wchk" checked onchange="showW=this.checked;draw()"> Pesos
+  </label>
+</div>
+
+<div id="main">
+  <div id="cw"><canvas id="gc"></canvas><div id="tt"></div></div>
+  <div id="panel">
+    <div class="ph" id="ph-title">Detalle UPL</div>
+    <div class="pb">
+      <div class="empty" id="emp">
+        Haz clic en una UPL para ver:<br><br>
+        · Indicadores de inseguridad por género<br>
+        · Percepción de espacios públicos<br>
+        · Satisfacción con transporte<br>
+        · Barrios con mayor inseguridad
+      </div>
+      <div id="det" style="display:none">
+        <div class="ntitle" id="d-name"></div>
+        <div class="nsub" id="d-sub"></div>
+        <div class="badges" id="d-badges"></div>
+
+        <div class="sec">
+          <div class="st">Inseguridad por género</div>
+          <div class="sr"><span class="sl">Mujeres</span><span class="sv" id="d-m" style="color:#F48A8A"></span></div>
+          <div class="bar"><div class="bf" id="b-m" style="background:#E24B4A"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Hombres</span><span class="sv" id="d-h" style="color:#79C0FF"></span></div>
+          <div class="bar"><div class="bf" id="b-h" style="background:#1F6FEB"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Brecha M−H</span><span class="sv" id="d-br"></span></div>
+        </div>
+
+        <div class="sec">
+          <div class="st">Indicadores de percepción</div>
+          <div class="sr"><span class="sl">Temor (entorno)</span><span class="sv" id="d-t"></span></div>
+          <div class="bar"><div class="bf" id="b-t" style="background:#E24B4A"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Irrespeto calle</span><span class="sv" id="d-i"></span></div>
+          <div class="bar"><div class="bf" id="b-i" style="background:#BA7517"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Agresión</span><span class="sv" id="d-a"></span></div>
+          <div class="bar"><div class="bf" id="b-a" style="background:#7C3AED"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Victimización real</span><span class="sv" id="d-v"></span></div>
+        </div>
+
+        <div class="sec">
+          <div class="st">Espacio público</div>
+          <div class="sr"><span class="sl">Paraderos (seg.)</span><span class="sv" id="d-par"></span></div>
+          <div class="bar"><div class="bf" id="b-par" style="background:#1D9E75"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Puentes peatonales</span><span class="sv" id="d-puen"></span></div>
+          <div class="bar"><div class="bf" id="b-puen" style="background:#1D9E75"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Ciclorutas</span><span class="sv" id="d-cicl"></span></div>
+          <div class="bar"><div class="bf" id="b-cicl" style="background:#1D9E75"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Calles comerciales</span><span class="sv" id="d-call"></span></div>
+        </div>
+
+        <div class="sec">
+          <div class="st">Movilidad</div>
+          <div class="sr"><span class="sl">Medio dominante</span><span class="sv" id="d-med"></span></div>
+          <div class="sr"><span class="sl">Satisf. transporte</span><span class="sv" id="d-st"></span></div>
+          <div class="bar"><div class="bf" id="b-st" style="background:#1F6FEB"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Satisf. parques</span><span class="sv" id="d-sp"></span></div>
+          <div class="bar"><div class="bf" id="b-sp" style="background:#1D9E75"></div></div>
+          <div class="sr"><span class="sl">NSE promedio</span><span class="sv" id="d-nse"></span></div>
+          <div class="sr"><span class="sl">Encuestados</span><span class="sv" id="d-n"></span></div>
+        </div>
+
+        <div class="btab">
+          <div class="btitle">Barrios con más registros</div>
+          <div id="d-barrios"></div>
+        </div>
+      </div>
+    </div>
+    <div class="leg">
+      <div class="lt">Leyenda</div>
+      <div class="lr"><div class="ld" style="background:#E24B4A"></div>Alta inseguridad / brecha</div>
+      <div class="lr"><div class="ld" style="background:#EF9F27"></div>Inseguridad media</div>
+      <div class="lr"><div class="ld" style="background:#1D9E75"></div>Inseguridad baja</div>
+      <div class="lr" style="margin-top:4px"><div class="ll" style="background:#E24B4A;opacity:.6"></div>Arista crítica</div>
+      <div class="lr"><div class="ll" style="background:#484F58"></div>Arista normal</div>
+      <div style="margin-top:6px;font-size:10px;color:#484F58">Tamaño nodo = magnitud del score</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const NODES = [{"id": 1, "name": "Paseos", "loc": "Usaquen", "x": 0.65, "y": 0.05, "inseg": 0.0, "score": 17.0, "temor": 10.0, "irresp": 20.0, "agres": 20.0, "mujer": 22.4, "hombre": 11.9, "brecha": 10.5, "nse": 3.9, "sat_transp": 5.1, "sat_parques": 12.9, "medio_dom": "N/D", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 847, "n_mov": 22, "barrios": []}, {"id": 2, "name": "Toberín", "loc": "Usaquen", "x": 0.6, "y": 0.09, "inseg": 0.0, "score": 17.0, "temor": 10.0, "irresp": 20.0, "agres": 20.0, "mujer": 22.4, "hombre": 11.9, "brecha": 10.5, "nse": 3.9, "sat_transp": 3.6, "sat_parques": 4.4, "medio_dom": "SITP/TM", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 847, "n_mov": 160, "barrios": []}, {"id": 3, "name": "Country Club", "loc": "Usaquen", "x": 0.55, "y": 0.06, "inseg": 0.0, "score": 17.0, "temor": 10.0, "irresp": 20.0, "agres": 20.0, "mujer": 22.4, "hombre": 11.9, "brecha": 10.5, "nse": 3.9, "sat_transp": 3.3, "sat_parques": 4.5, "medio_dom": "SITP/TM", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 847, "n_mov": 309, "barrios": []}, {"id": 4, "name": "Pardo Rubio", "loc": "Chapinero", "x": 0.57, "y": 0.17, "inseg": 51.0, "score": 23.5, "temor": 20.0, "irresp": 30.0, "agres": 20.0, "mujer": 27.3, "hombre": 16.5, "brecha": 10.8, "nse": 4.1, "sat_transp": 4.1, "sat_parques": 5.1, "medio_dom": "SITP/TM", "par_seg": 6.4, "puen_seg": 5.2, "cicl_seg": 11.4, "call_seg": 4.5, "n_vic": 995, "n_gen": 647, "n_mov": 312, "barrios": [{"name": "Chico", "n": 131, "inseg": 50.5}, {"name": "Chapinero", "n": 82, "inseg": 52.5}, {"name": "San Luis", "n": 64, "inseg": 54.8}, {"name": "Sucre", "n": 60, "inseg": 49.5}, {"name": "Chapinero Alto", "n": 58, "inseg": 46.0}, {"name": "Pardo Rubio", "n": 50, "inseg": 54.8}, {"name": "Virrey", "n": 32, "inseg": 50.1}, {"name": "Bosque Calderón Tejada", "n": 23, "inseg": 50.9}, {"name": "San Martin", "n": 23, "inseg": 49.3}, {"name": "La Cabrera", "n": 21, "inseg": 55.7}, {"name": "San Isidro", "n": 18, "inseg": 44.4}, {"name": "Antiguo Country", "n": 18, "inseg": 38.9}]}, {"id": 5, "name": "El Refugio", "loc": "Chapinero", "x": 0.52, "y": 0.2, "inseg": 51.0, "score": 23.5, "temor": 20.0, "irresp": 30.0, "agres": 20.0, "mujer": 27.3, "hombre": 16.5, "brecha": 10.8, "nse": 4.1, "sat_transp": 3.8, "sat_parques": 4.0, "medio_dom": "N/D", "par_seg": 6.4, "puen_seg": 5.2, "cicl_seg": 11.4, "call_seg": 4.5, "n_vic": 995, "n_gen": 647, "n_mov": 673, "barrios": [{"name": "Chico", "n": 131, "inseg": 50.5}, {"name": "Chapinero", "n": 82, "inseg": 52.5}, {"name": "San Luis", "n": 64, "inseg": 54.8}, {"name": "Sucre", "n": 60, "inseg": 49.5}, {"name": "Chapinero Alto", "n": 58, "inseg": 46.0}, {"name": "Pardo Rubio", "n": 50, "inseg": 54.8}, {"name": "Virrey", "n": 32, "inseg": 50.1}, {"name": "Bosque Calderón Tejada", "n": 23, "inseg": 50.9}, {"name": "San Martin", "n": 23, "inseg": 49.3}, {"name": "La Cabrera", "n": 21, "inseg": 55.7}, {"name": "San Isidro", "n": 18, "inseg": 44.4}, {"name": "Antiguo Country", "n": 18, "inseg": 38.9}]}, {"id": 6, "name": "Las Nieves", "loc": "Santa Fe", "x": 0.5, "y": 0.28, "inseg": 51.7, "score": 27.0, "temor": 20.0, "irresp": 30.0, "agres": 30.0, "mujer": 35.1, "hombre": 18.6, "brecha": 16.5, "nse": 2.5, "sat_transp": 3.9, "sat_parques": 4.4, "medio_dom": "SITP/TM", "par_seg": 5.1, "puen_seg": 7.8, "cicl_seg": 13.4, "call_seg": 5.0, "n_vic": 912, "n_gen": 554, "n_mov": 185, "barrios": [{"name": "Perseverancia", "n": 97, "inseg": 46.2}, {"name": "San Bernardo", "n": 82, "inseg": 51.4}, {"name": "Las Cruces", "n": 46, "inseg": 52.3}, {"name": "La Perseverancia", "n": 37, "inseg": 52.4}, {"name": "Los Laches", "n": 37, "inseg": 51.5}, {"name": "Sanbernardo", "n": 37, "inseg": 56.9}, {"name": "Samper", "n": 36, "inseg": 59.4}, {"name": "Macarena", "n": 34, "inseg": 54.1}, {"name": "San Martin", "n": 28, "inseg": 53.8}, {"name": "Guavio", "n": 25, "inseg": 42.6}, {"name": "Las Nieves", "n": 22, "inseg": 54.6}, {"name": "Santa Fe", "n": 19, "inseg": 47.4}]}, {"id": 7, "name": "La Candelaria", "loc": "La Candelaria", "x": 0.48, "y": 0.33, "inseg": 48.7, "score": 37.0, "temor": 30.0, "irresp": 40.0, "agres": 40.0, "mujer": 51.9, "hombre": 27.3, "brecha": 24.6, "nse": 2.5, "sat_transp": 3.4, "sat_parques": 3.1, "medio_dom": "N/D", "par_seg": 4.2, "puen_seg": 4.9, "cicl_seg": 12.5, "call_seg": 5.3, "n_vic": 840, "n_gen": 393, "n_mov": 109, "barrios": [{"name": "Candelaria", "n": 160, "inseg": 47.1}, {"name": "Belén", "n": 104, "inseg": 44.3}, {"name": "La Candelaria", "n": 72, "inseg": 47.7}, {"name": "Belen", "n": 51, "inseg": 51.7}, {"name": "Concordia", "n": 45, "inseg": 49.0}, {"name": "Santabarbara", "n": 34, "inseg": 49.1}, {"name": "Egipto", "n": 33, "inseg": 42.4}, {"name": "Las Aguas", "n": 28, "inseg": 48.9}, {"name": "Guavio", "n": 26, "inseg": 47.4}, {"name": "Aguas", "n": 24, "inseg": 50.0}, {"name": "Nueva Santafe", "n": 24, "inseg": 59.9}, {"name": "Nueva Santa Fe", "n": 22, "inseg": 53.1}]}, {"id": 8, "name": "San Blas", "loc": "San Cristobal", "x": 0.63, "y": 0.42, "inseg": 0.0, "score": 27.0, "temor": 20.0, "irresp": 30.0, "agres": 30.0, "mujer": 34.0, "hombre": 19.4, "brecha": 14.6, "nse": 2.2, "sat_transp": 4.8, "sat_parques": 4.1, "medio_dom": "Alimentador", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 753, "n_mov": 209, "barrios": []}, {"id": 9, "name": "Quiroga", "loc": "San Cristobal", "x": 0.57, "y": 0.48, "inseg": 0.0, "score": 27.0, "temor": 20.0, "irresp": 30.0, "agres": 30.0, "mujer": 34.0, "hombre": 19.4, "brecha": 14.6, "nse": 2.2, "sat_transp": 3.4, "sat_parques": 4.0, "medio_dom": "SITP/TM", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 753, "n_mov": 564, "barrios": []}, {"id": 10, "name": "Gran Yomasa", "loc": "Usme", "x": 0.68, "y": 0.62, "inseg": 51.6, "score": 23.5, "temor": 20.0, "irresp": 30.0, "agres": 20.0, "mujer": 35.8, "hombre": 18.6, "brecha": 17.2, "nse": 1.8, "sat_transp": 3.6, "sat_parques": 6.0, "medio_dom": "SITP/TM", "par_seg": 3.7, "puen_seg": 6.5, "cicl_seg": 17.6, "call_seg": 5.7, "n_vic": 1035, "n_gen": 757, "n_mov": 646, "barrios": [{"name": "Chuniza", "n": 35, "inseg": 56.3}, {"name": "Alfonso López", "n": 34, "inseg": 53.1}, {"name": "Danubio Azul", "n": 33, "inseg": 42.5}, {"name": "Marichuela", "n": 33, "inseg": 51.6}, {"name": "La Fortaleza", "n": 28, "inseg": 54.9}, {"name": "La Aurora", "n": 28, "inseg": 56.1}, {"name": "Porvenir", "n": 26, "inseg": 55.3}, {"name": "Virrey", "n": 22, "inseg": 47.0}, {"name": "Las Violetas", "n": 22, "inseg": 50.2}, {"name": "El Virrey", "n": 21, "inseg": 57.4}, {"name": "Antonio José De Sucre", "n": 21, "inseg": 52.5}, {"name": "Usminia", "n": 20, "inseg": 51.8}]}, {"id": 11, "name": "Comuneros", "loc": "Usme", "x": 0.62, "y": 0.7, "inseg": 51.6, "score": 23.5, "temor": 20.0, "irresp": 30.0, "agres": 20.0, "mujer": 35.8, "hombre": 18.6, "brecha": 17.2, "nse": 1.8, "sat_transp": 3.8, "sat_parques": 6.1, "medio_dom": "N/D", "par_seg": 3.7, "puen_seg": 6.5, "cicl_seg": 17.6, "call_seg": 5.7, "n_vic": 1035, "n_gen": 757, "n_mov": 434, "barrios": [{"name": "Chuniza", "n": 35, "inseg": 56.3}, {"name": "Alfonso López", "n": 34, "inseg": 53.1}, {"name": "Danubio Azul", "n": 33, "inseg": 42.5}, {"name": "Marichuela", "n": 33, "inseg": 51.6}, {"name": "La Fortaleza", "n": 28, "inseg": 54.9}, {"name": "La Aurora", "n": 28, "inseg": 56.1}, {"name": "Porvenir", "n": 26, "inseg": 55.3}, {"name": "Virrey", "n": 22, "inseg": 47.0}, {"name": "Las Violetas", "n": 22, "inseg": 50.2}, {"name": "El Virrey", "n": 21, "inseg": 57.4}, {"name": "Antonio José De Sucre", "n": 21, "inseg": 52.5}, {"name": "Usminia", "n": 20, "inseg": 51.8}]}, {"id": 12, "name": "Venecia", "loc": "Tunjuelito", "x": 0.52, "y": 0.6, "inseg": 52.4, "score": 26.5, "temor": 30.0, "irresp": 30.0, "agres": 20.0, "mujer": 31.9, "hombre": 20.9, "brecha": 11.0, "nse": 2.3, "sat_transp": 4.0, "sat_parques": 5.6, "medio_dom": "N/D", "par_seg": 5.4, "puen_seg": 5.5, "cicl_seg": 17.0, "call_seg": 5.0, "n_vic": 1018, "n_gen": 625, "n_mov": 352, "barrios": [{"name": "Isla Del Sol", "n": 174, "inseg": 49.7}, {"name": "San Carlos", "n": 168, "inseg": 55.1}, {"name": "San Vicente Ferrer", "n": 99, "inseg": 50.6}, {"name": "Tunal", "n": 85, "inseg": 51.2}, {"name": "San Vicente", "n": 59, "inseg": 54.9}, {"name": "San Benito", "n": 51, "inseg": 55.7}, {"name": "Tunjuelito", "n": 41, "inseg": 52.1}, {"name": "Nuevo Muzu", "n": 37, "inseg": 54.2}, {"name": "Fatima", "n": 35, "inseg": 52.5}, {"name": "Santa Lucia", "n": 33, "inseg": 56.8}, {"name": "Fátima", "n": 31, "inseg": 57.2}, {"name": "Abraham Lincoln", "n": 22, "inseg": 50.2}]}, {"id": 13, "name": "Apogeo", "loc": "Bosa", "x": 0.28, "y": 0.7, "inseg": 53.4, "score": 33.5, "temor": 30.0, "irresp": 40.0, "agres": 30.0, "mujer": 35.9, "hombre": 24.0, "brecha": 11.9, "nse": 1.9, "sat_transp": 3.5, "sat_parques": 3.6, "medio_dom": "SITP/TM", "par_seg": 4.7, "puen_seg": 5.7, "cicl_seg": 12.9, "call_seg": 5.4, "n_vic": 1249, "n_gen": 889, "n_mov": 985, "barrios": [{"name": "Villa Del Rio", "n": 149, "inseg": 54.0}, {"name": "Bosa Porvenir", "n": 103, "inseg": 49.0}, {"name": "Villa Del Río", "n": 41, "inseg": 57.1}, {"name": "Bosa Brasil", "n": 35, "inseg": 56.3}, {"name": "Porvenir", "n": 34, "inseg": 58.1}, {"name": "Parques De Bogotá", "n": 31, "inseg": 47.5}, {"name": "Bosa La Esperanza", "n": 29, "inseg": 54.2}, {"name": "Laureles", "n": 26, "inseg": 55.3}, {"name": "San Antonio", "n": 25, "inseg": 57.5}, {"name": "La Esperanza", "n": 21, "inseg": 57.3}, {"name": "Bosa La Paz", "n": 20, "inseg": 51.8}, {"name": "José Antonio Galan", "n": 18, "inseg": 48.2}]}, {"id": 14, "name": "Tintal-Zona Franca", "loc": "Bosa", "x": 0.22, "y": 0.65, "inseg": 53.4, "score": 33.5, "temor": 30.0, "irresp": 40.0, "agres": 30.0, "mujer": 35.9, "hombre": 24.0, "brecha": 11.9, "nse": 1.9, "sat_transp": 3.4, "sat_parques": 4.6, "medio_dom": "SITP/TM", "par_seg": 4.7, "puen_seg": 5.7, "cicl_seg": 12.9, "call_seg": 5.4, "n_vic": 1249, "n_gen": 889, "n_mov": 3005, "barrios": [{"name": "Villa Del Rio", "n": 149, "inseg": 54.0}, {"name": "Bosa Porvenir", "n": 103, "inseg": 49.0}, {"name": "Villa Del Río", "n": 41, "inseg": 57.1}, {"name": "Bosa Brasil", "n": 35, "inseg": 56.3}, {"name": "Porvenir", "n": 34, "inseg": 58.1}, {"name": "Parques De Bogotá", "n": 31, "inseg": 47.5}, {"name": "Bosa La Esperanza", "n": 29, "inseg": 54.2}, {"name": "Laureles", "n": 26, "inseg": 55.3}, {"name": "San Antonio", "n": 25, "inseg": 57.5}, {"name": "La Esperanza", "n": 21, "inseg": 57.3}, {"name": "Bosa La Paz", "n": 20, "inseg": 51.8}, {"name": "José Antonio Galan", "n": 18, "inseg": 48.2}]}, {"id": 15, "name": "Américas", "loc": "Kennedy", "x": 0.25, "y": 0.52, "inseg": 54.1, "score": 13.5, "temor": 10.0, "irresp": 20.0, "agres": 10.0, "mujer": 20.3, "hombre": 6.6, "brecha": 13.7, "nse": 2.7, "sat_transp": 3.7, "sat_parques": 4.0, "medio_dom": "SITP/TM", "par_seg": 5.2, "puen_seg": 5.0, "cicl_seg": 9.3, "call_seg": 4.4, "n_vic": 1371, "n_gen": 983, "n_mov": 978, "barrios": [{"name": "Tierra Buena", "n": 86, "inseg": 54.8}, {"name": "Las Margaritas", "n": 80, "inseg": 57.7}, {"name": "Castilla", "n": 70, "inseg": 58.8}, {"name": "Patio Bonito", "n": 47, "inseg": 52.6}, {"name": "Roma", "n": 36, "inseg": 52.0}, {"name": "La Igualdad", "n": 32, "inseg": 58.5}, {"name": "Kennedy Techo", "n": 31, "inseg": 55.0}, {"name": "Kennedy Central", "n": 29, "inseg": 57.7}, {"name": "Britalia", "n": 27, "inseg": 44.5}, {"name": "Nueva York", "n": 26, "inseg": 47.5}, {"name": "Tintal", "n": 25, "inseg": 54.8}, {"name": "Floresta Sur", "n": 24, "inseg": 51.5}]}, {"id": 16, "name": "Corabastos", "loc": "Kennedy", "x": 0.3, "y": 0.58, "inseg": 54.1, "score": 13.5, "temor": 10.0, "irresp": 20.0, "agres": 10.0, "mujer": 20.3, "hombre": 6.6, "brecha": 13.7, "nse": 2.7, "sat_transp": 3.9, "sat_parques": 7.6, "medio_dom": "SITP/TM", "par_seg": 5.2, "puen_seg": 5.0, "cicl_seg": 9.3, "call_seg": 4.4, "n_vic": 1371, "n_gen": 983, "n_mov": 1400, "barrios": [{"name": "Tierra Buena", "n": 86, "inseg": 54.8}, {"name": "Las Margaritas", "n": 80, "inseg": 57.7}, {"name": "Castilla", "n": 70, "inseg": 58.8}, {"name": "Patio Bonito", "n": 47, "inseg": 52.6}, {"name": "Roma", "n": 36, "inseg": 52.0}, {"name": "La Igualdad", "n": 32, "inseg": 58.5}, {"name": "Kennedy Techo", "n": 31, "inseg": 55.0}, {"name": "Kennedy Central", "n": 29, "inseg": 57.7}, {"name": "Britalia", "n": 27, "inseg": 44.5}, {"name": "Nueva York", "n": 26, "inseg": 47.5}, {"name": "Tintal", "n": 25, "inseg": 54.8}, {"name": "Floresta Sur", "n": 24, "inseg": 51.5}]}, {"id": 17, "name": "Aeropuerto El Dorado", "loc": "Fontibon", "x": 0.18, "y": 0.38, "inseg": 0.0, "score": 30.5, "temor": 20.0, "irresp": 40.0, "agres": 30.0, "mujer": 38.8, "hombre": 22.6, "brecha": 16.2, "nse": 2.9, "sat_transp": 3.5, "sat_parques": 4.9, "medio_dom": "SITP/TM", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 783, "n_mov": 996, "barrios": []}, {"id": 18, "name": "Zona Franca", "loc": "Fontibon", "x": 0.16, "y": 0.45, "inseg": 0.0, "score": 30.5, "temor": 20.0, "irresp": 40.0, "agres": 30.0, "mujer": 38.8, "hombre": 22.6, "brecha": 16.2, "nse": 2.9, "sat_transp": 3.2, "sat_parques": 6.6, "medio_dom": "SITP/TM", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 783, "n_mov": 986, "barrios": []}, {"id": 19, "name": "Minuto de Dios", "loc": "Engativa", "x": 0.22, "y": 0.26, "inseg": 0.0, "score": 30.5, "temor": 20.0, "irresp": 40.0, "agres": 30.0, "mujer": 37.6, "hombre": 16.7, "brecha": 20.9, "nse": 3.3, "sat_transp": 4.1, "sat_parques": 3.7, "medio_dom": "Alimentador", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 956, "n_mov": 108, "barrios": []}, {"id": 20, "name": "Bolivia", "loc": "Engativa", "x": 0.28, "y": 0.32, "inseg": 0.0, "score": 30.5, "temor": 20.0, "irresp": 40.0, "agres": 30.0, "mujer": 37.6, "hombre": 16.7, "brecha": 20.9, "nse": 3.3, "sat_transp": 3.4, "sat_parques": 4.6, "medio_dom": "N/D", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 956, "n_mov": 240, "barrios": []}, {"id": 21, "name": "Tibabuyes", "loc": "Suba", "x": 0.33, "y": 0.1, "inseg": 54.1, "score": 23.5, "temor": 20.0, "irresp": 30.0, "agres": 20.0, "mujer": 28.8, "hombre": 11.7, "brecha": 17.1, "nse": 3.0, "sat_transp": 0.0, "sat_parques": 0.0, "medio_dom": "N/D", "par_seg": 4.7, "puen_seg": 4.2, "cicl_seg": 10.4, "call_seg": 4.1, "n_vic": 1413, "n_gen": 955, "n_mov": 0, "barrios": [{"name": "Prado Veraniego", "n": 47, "inseg": 48.4}, {"name": "La Campiña", "n": 37, "inseg": 56.1}, {"name": "Bilbao", "n": 37, "inseg": 55.1}, {"name": "Pasadena", "n": 31, "inseg": 49.5}, {"name": "Suba Rincon", "n": 29, "inseg": 56.5}, {"name": "Pontevedra", "n": 28, "inseg": 57.3}, {"name": "Las Flores", "n": 27, "inseg": 53.2}, {"name": "Compartir", "n": 26, "inseg": 55.3}, {"name": "Britalia Norte", "n": 25, "inseg": 53.4}, {"name": "Lombardia", "n": 22, "inseg": 53.1}, {"name": "Niza Ix", "n": 20, "inseg": 51.8}, {"name": "Pinar", "n": 20, "inseg": 56.9}]}, {"id": 22, "name": "La Academia", "loc": "Suba", "x": 0.4, "y": 0.14, "inseg": 54.1, "score": 23.5, "temor": 20.0, "irresp": 30.0, "agres": 20.0, "mujer": 28.8, "hombre": 11.7, "brecha": 17.1, "nse": 3.0, "sat_transp": 6.0, "sat_parques": 3.2, "medio_dom": "N/D", "par_seg": 4.7, "puen_seg": 4.2, "cicl_seg": 10.4, "call_seg": 4.1, "n_vic": 1413, "n_gen": 955, "n_mov": 27, "barrios": [{"name": "Prado Veraniego", "n": 47, "inseg": 48.4}, {"name": "La Campiña", "n": 37, "inseg": 56.1}, {"name": "Bilbao", "n": 37, "inseg": 55.1}, {"name": "Pasadena", "n": 31, "inseg": 49.5}, {"name": "Suba Rincon", "n": 29, "inseg": 56.5}, {"name": "Pontevedra", "n": 28, "inseg": 57.3}, {"name": "Las Flores", "n": 27, "inseg": 53.2}, {"name": "Compartir", "n": 26, "inseg": 55.3}, {"name": "Britalia Norte", "n": 25, "inseg": 53.4}, {"name": "Lombardia", "n": 22, "inseg": 53.1}, {"name": "Niza Ix", "n": 20, "inseg": 51.8}, {"name": "Pinar", "n": 20, "inseg": 56.9}]}, {"id": 23, "name": "12 de Octubre", "loc": "Barrios Unidos", "x": 0.42, "y": 0.22, "inseg": 54.4, "score": 23.5, "temor": 20.0, "irresp": 30.0, "agres": 20.0, "mujer": 27.7, "hombre": 20.6, "brecha": 7.1, "nse": 3.2, "sat_transp": 3.8, "sat_parques": 3.4, "medio_dom": "N/D", "par_seg": 5.7, "puen_seg": 3.7, "cicl_seg": 12.1, "call_seg": 3.8, "n_vic": 912, "n_gen": 719, "n_mov": 1103, "barrios": [{"name": "Modelo Norte", "n": 114, "inseg": 55.4}, {"name": "Simón Bolivar", "n": 110, "inseg": 57.2}, {"name": "San Fernando", "n": 81, "inseg": 52.8}, {"name": "Colombia", "n": 54, "inseg": 55.1}, {"name": "Rionegro", "n": 53, "inseg": 53.6}, {"name": "La Castellana", "n": 32, "inseg": 55.3}, {"name": "Andes", "n": 31, "inseg": 51.7}, {"name": "Muequeta", "n": 29, "inseg": 53.0}, {"name": "Modelo", "n": 25, "inseg": 56.1}, {"name": "Simon Bolivar", "n": 22, "inseg": 54.7}, {"name": "Benjamín Herrera", "n": 21, "inseg": 50.9}, {"name": "Polo", "n": 19, "inseg": 56.4}]}, {"id": 24, "name": "Parque Simón Bolívar-CAN", "loc": "Teusaquillo", "x": 0.44, "y": 0.3, "inseg": 53.6, "score": 40.5, "temor": 30.0, "irresp": 50.0, "agres": 40.0, "mujer": 49.0, "hombre": 25.4, "brecha": 23.6, "nse": 3.2, "sat_transp": 3.6, "sat_parques": 3.7, "medio_dom": "SITP/TM", "par_seg": 6.1, "puen_seg": 4.2, "cicl_seg": 14.3, "call_seg": 4.1, "n_vic": 988, "n_gen": 618, "n_mov": 555, "barrios": [{"name": "Nicolás De Federman", "n": 178, "inseg": 55.0}, {"name": "El Salitre", "n": 88, "inseg": 49.0}, {"name": "Salitre", "n": 66, "inseg": 55.2}, {"name": "Ciudad Salitre", "n": 54, "inseg": 51.3}, {"name": "Salitre Oriental", "n": 54, "inseg": 54.4}, {"name": "San Luis", "n": 35, "inseg": 62.1}, {"name": "Quirinal", "n": 32, "inseg": 54.2}, {"name": "Quinta Paredes", "n": 30, "inseg": 54.6}, {"name": "Gran América", "n": 28, "inseg": 54.9}, {"name": "Chapinero", "n": 25, "inseg": 48.1}, {"name": "Acevedo Tejada", "n": 25, "inseg": 50.8}, {"name": "El Recuerdo", "n": 22, "inseg": 53.2}]}, {"id": 25, "name": "La Sabana", "loc": "Los Martires", "x": 0.44, "y": 0.4, "inseg": 0.0, "score": 33.5, "temor": 30.0, "irresp": 40.0, "agres": 30.0, "mujer": 37.5, "hombre": 23.3, "brecha": 14.2, "nse": 2.9, "sat_transp": 3.7, "sat_parques": 4.2, "medio_dom": "SITP/TM", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 521, "n_mov": 753, "barrios": []}, {"id": 26, "name": "Restrepo", "loc": "Antonio Nariño", "x": 0.53, "y": 0.5, "inseg": 55.0, "score": 30.0, "temor": 30.0, "irresp": 30.0, "agres": 30.0, "mujer": 33.1, "hombre": 24.7, "brecha": 8.4, "nse": 2.8, "sat_transp": 3.7, "sat_parques": 6.2, "medio_dom": "SITP/TM", "par_seg": 5.3, "puen_seg": 5.0, "cicl_seg": 16.7, "call_seg": 3.8, "n_vic": 923, "n_gen": 483, "n_mov": 318, "barrios": [{"name": "Restrepo", "n": 333, "inseg": 54.7}, {"name": "Policarpa", "n": 114, "inseg": 56.3}, {"name": "Ciudad Jardín Sur", "n": 77, "inseg": 56.1}, {"name": "Ciudad Berna", "n": 60, "inseg": 56.3}, {"name": "Villa Mayor", "n": 47, "inseg": 52.6}, {"name": "Ciudad Jardín", "n": 43, "inseg": 61.5}, {"name": "Villa Mayor Antiguo", "n": 38, "inseg": 54.6}, {"name": "Villamayor Antigua", "n": 33, "inseg": 54.7}, {"name": "Santander", "n": 31, "inseg": 48.4}, {"name": "San Jorge Central", "n": 26, "inseg": 54.0}, {"name": "La Fragua", "n": 24, "inseg": 55.7}, {"name": "Cuidad Berna", "n": 19, "inseg": 58.1}]}, {"id": 27, "name": "Zona Industrial", "loc": "Puente Aranda", "x": 0.37, "y": 0.44, "inseg": 55.4, "score": 27.0, "temor": 20.0, "irresp": 30.0, "agres": 30.0, "mujer": 32.5, "hombre": 22.7, "brecha": 9.8, "nse": 2.9, "sat_transp": 3.8, "sat_parques": 4.0, "medio_dom": "Alimentador", "par_seg": 5.4, "puen_seg": 4.8, "cicl_seg": 12.2, "call_seg": 3.8, "n_vic": 920, "n_gen": 698, "n_mov": 698, "barrios": [{"name": "San Rafael", "n": 89, "inseg": 56.3}, {"name": "Primavera", "n": 65, "inseg": 52.4}, {"name": "Tibana", "n": 63, "inseg": 54.1}, {"name": "Galan", "n": 49, "inseg": 55.9}, {"name": "Galán", "n": 43, "inseg": 57.6}, {"name": "Santa Rita", "n": 41, "inseg": 53.0}, {"name": "San Eusebio", "n": 37, "inseg": 56.0}, {"name": "Asunción", "n": 35, "inseg": 56.3}, {"name": "Jazmin", "n": 34, "inseg": 63.0}, {"name": "Villa Ines", "n": 34, "inseg": 53.1}, {"name": "Santa Matilde", "n": 30, "inseg": 56.8}, {"name": "Alcalá", "n": 25, "inseg": 60.2}]}, {"id": 28, "name": "Marruecos", "loc": "Rafael Uribe Uribe", "x": 0.55, "y": 0.57, "inseg": 53.6, "score": 16.5, "temor": 20.0, "irresp": 20.0, "agres": 10.0, "mujer": 26.2, "hombre": 13.0, "brecha": 13.2, "nse": 2.4, "sat_transp": 3.4, "sat_parques": 4.4, "medio_dom": "N/D", "par_seg": 3.7, "puen_seg": 6.2, "cicl_seg": 19.1, "call_seg": 5.5, "n_vic": 975, "n_gen": 844, "n_mov": 893, "barrios": [{"name": "Diana Turbay", "n": 52, "inseg": 52.0}, {"name": "Bravo Paez", "n": 44, "inseg": 55.4}, {"name": "Centenario", "n": 36, "inseg": 54.7}, {"name": "Gustavo Restrepo", "n": 36, "inseg": 55.7}, {"name": "Ingles", "n": 33, "inseg": 51.7}, {"name": "Villa Mayor", "n": 31, "inseg": 51.6}, {"name": "Bosque De San Carlos", "n": 31, "inseg": 60.5}, {"name": "Molinos", "n": 29, "inseg": 50.7}, {"name": "El Triunfo", "n": 29, "inseg": 50.7}, {"name": "Marruecos", "n": 27, "inseg": 54.4}, {"name": "Cerros De Oriente", "n": 26, "inseg": 56.6}, {"name": "La Paz", "n": 26, "inseg": 52.6}]}, {"id": 29, "name": "Lucero", "loc": "Ciudad Bolivar", "x": 0.4, "y": 0.78, "inseg": 0.0, "score": 30.5, "temor": 20.0, "irresp": 40.0, "agres": 30.0, "mujer": 30.7, "hombre": 21.8, "brecha": 8.9, "nse": 1.3, "sat_transp": 3.6, "sat_parques": 3.4, "medio_dom": "SITP/TM", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 0, "n_gen": 837, "n_mov": 985, "barrios": []}, {"id": 30, "name": "Sumapaz", "loc": "Sumapaz", "x": 0.6, "y": 0.9, "inseg": 57.6, "score": 10.0, "temor": 10.0, "irresp": 10.0, "agres": 10.0, "mujer": 17.6, "hombre": 0.0, "brecha": 17.6, "nse": 1.6, "sat_transp": 3.7, "sat_parques": 3.7, "medio_dom": "SITP/TM", "par_seg": 0.0, "puen_seg": 0.0, "cicl_seg": 0.0, "call_seg": 0.0, "n_vic": 69, "n_gen": 100, "n_mov": 860, "barrios": [{"name": "Nazareth", "n": 24, "inseg": 47.2}, {"name": "La Union", "n": 17, "inseg": 66.8}, {"name": "San Juan", "n": 11, "inseg": 63.7}, {"name": "Betania", "n": 9, "inseg": 40.8}, {"name": "Nueva Granada", "n": 8, "inseg": 79.4}]}];
+const EDGES = {
+  vecino:[[1, 2, 0.9], [1, 3, 0.85], [2, 3, 0.8], [3, 4, 0.75], [4, 5, 0.85], [4, 6, 0.7], [5, 6, 0.8], [5, 24, 0.7], [6, 7, 0.9], [6, 25, 0.75], [7, 25, 0.8], [8, 9, 0.85], [8, 26, 0.7], [9, 12, 0.75], [9, 26, 0.8], [9, 28, 0.7], [10, 11, 0.85], [10, 30, 0.6], [11, 12, 0.7], [11, 28, 0.75], [12, 13, 0.65], [12, 16, 0.7], [13, 14, 0.8], [13, 16, 0.75], [13, 29, 0.75], [14, 15, 0.85], [15, 16, 0.8], [15, 18, 0.7], [15, 27, 0.65], [17, 18, 0.85], [17, 19, 0.8], [18, 20, 0.7], [19, 20, 0.85], [19, 21, 0.7], [19, 23, 0.8], [20, 23, 0.75], [21, 22, 0.9], [22, 23, 0.85], [23, 24, 0.8], [24, 25, 0.85], [24, 27, 0.75], [25, 26, 0.8], [25, 27, 0.7], [25, 27, 0.7], [26, 28, 0.85], [28, 29, 0.8]],
+  sim:[[1, 2, 1.0], [1, 3, 1.0], [1, 17, 0.91], [1, 18, 0.91], [1, 19, 0.91], [1, 20, 0.91], [1, 29, 0.91], [2, 3, 1.0], [2, 17, 0.91], [2, 18, 0.91], [2, 19, 0.91], [2, 20, 0.91], [2, 29, 0.91], [3, 17, 0.91], [3, 18, 0.91], [3, 19, 0.91], [3, 20, 0.91], [3, 29, 0.91], [4, 5, 1.0], [4, 6, 0.97], [4, 7, 0.92], [4, 10, 1.0], [4, 11, 1.0], [4, 12, 0.96], [4, 13, 0.96], [4, 14, 0.96], [4, 21, 1.0], [4, 22, 1.0], [4, 23, 1.0], [4, 24, 0.93], [4, 26, 0.96], [4, 27, 0.98], [4, 28, 0.93], [5, 6, 0.97], [5, 7, 0.92], [5, 10, 1.0], [5, 11, 1.0], [5, 12, 0.96], [5, 13, 0.96], [5, 14, 0.96], [5, 21, 1.0], [5, 22, 1.0], [5, 23, 1.0], [5, 24, 0.93], [5, 26, 0.96], [5, 27, 0.98], [5, 28, 0.93], [6, 7, 0.97], [6, 10, 0.97], [6, 11, 0.97], [6, 12, 0.92], [6, 13, 0.97], [6, 14, 0.97], [6, 21, 0.97], [6, 22, 0.97], [6, 23, 0.97], [6, 24, 0.97], [6, 26, 0.97], [6, 27, 1.0], [7, 8, 0.9], [7, 9, 0.9], [7, 10, 0.92], [7, 11, 0.92], [7, 12, 0.93], [7, 13, 0.99], [7, 14, 0.99], [7, 21, 0.91], [7, 22, 0.91], [7, 23, 0.91], [7, 24, 0.99], [7, 25, 0.9], [7, 26, 0.98], [7, 27, 0.96], [8, 9, 1.0], [8, 17, 0.99], [8, 18, 0.99], [8, 19, 0.99], [8, 20, 0.99], [8, 24, 0.9], [8, 25, 0.97], [8, 29, 0.99], [9, 17, 0.99], [9, 18, 0.99], [9, 19, 0.99], [9, 20, 0.99], [9, 24, 0.9], [9, 25, 0.97], [9, 29, 0.99], [10, 11, 1.0], [10, 12, 0.96], [10, 13, 0.96], [10, 14, 0.96], [10, 21, 1.0], [10, 22, 1.0], [10, 23, 1.0], [10, 24, 0.93], [10, 26, 0.96], [10, 27, 0.98], [10, 28, 0.93], [11, 12, 0.96], [11, 13, 0.96], [11, 14, 0.96], [11, 21, 1.0], [11, 22, 1.0], [11, 23, 1.0], [11, 24, 0.93], [11, 26, 0.96], [11, 27, 0.98], [11, 28, 0.93], [12, 13, 0.98], [12, 14, 0.98], [12, 21, 0.95], [12, 22, 0.95], [12, 23, 0.95], [12, 24, 0.93], [12, 26, 0.98], [12, 27, 0.92], [12, 28, 0.91], [13, 14, 1.0], [13, 21, 0.96], [13, 22, 0.96], [13, 23, 0.95], [13, 24, 0.99], [13, 26, 0.99], [13, 27, 0.96], [14, 21, 0.96], [14, 22, 0.96], [14, 23, 0.95], [14, 24, 0.99], [14, 26, 0.99], [14, 27, 0.96], [15, 16, 1.0], [15, 30, 0.96], [16, 30, 0.96], [17, 18, 1.0], [17, 19, 1.0], [17, 20, 1.0], [17, 24, 0.9], [17, 25, 0.96], [17, 29, 1.0], [18, 19, 1.0], [18, 20, 1.0], [18, 24, 0.9], [18, 25, 0.96], [18, 29, 1.0], [19, 20, 1.0], [19, 24, 0.9], [19, 25, 0.96], [19, 29, 1.0], [20, 24, 0.9], [20, 25, 0.96], [20, 29, 1.0], [21, 22, 1.0], [21, 23, 1.0], [21, 24, 0.92], [21, 26, 0.95], [21, 27, 0.98], [21, 28, 0.93], [22, 23, 1.0], [22, 24, 0.92], [22, 26, 0.95], [22, 27, 0.98], [22, 28, 0.93], [23, 24, 0.92], [23, 26, 0.95], [23, 27, 0.98], [23, 28, 0.93], [24, 25, 0.9], [24, 26, 0.97], [24, 27, 0.96], [24, 29, 0.9], [25, 29, 0.96], [26, 27, 0.96]],
+  brecha:[[5, 24, 0.43], [6, 7, 0.51], [6, 25, 0.38], [7, 25, 0.48], [8, 9, 0.36], [9, 28, 0.35], [10, 11, 0.43], [10, 30, 0.43], [11, 12, 0.35], [11, 28, 0.38], [15, 18, 0.37], [17, 18, 0.4], [17, 19, 0.46], [18, 20, 0.46], [19, 20, 0.52], [19, 21, 0.47], [19, 23, 0.35], [20, 23, 0.35], [21, 22, 0.43], [23, 24, 0.38], [24, 25, 0.47], [24, 27, 0.42]],
+  transp:[[1, 2, 0.93], [1, 3, 0.92], [2, 3, 0.84], [4, 5, 0.9], [8, 9, 0.91], [10, 11, 0.87], [13, 14, 0.84], [15, 16, 0.88], [17, 18, 0.83], [19, 20, 0.88], [21, 22, 0.8]]
+};
+
+const canvas = document.getElementById('gc');
+const ctx    = canvas.getContext('2d');
+const tt     = document.getElementById('tt');
+let W,H,selected=null,hovered=null,vmode='score',emode='vecino',showW=true;
+
+const nodeMap = {};
+NODES.forEach(n=>nodeMap[n.id]=n);
+
+function getScore(n){
+  if(vmode==='mujer')     return n.mujer;
+  if(vmode==='hombre')    return n.hombre;
+  if(vmode==='brecha')    return Math.max(n.brecha,0);
+  if(vmode==='inseg')     return n.inseg;
+  if(vmode==='sat_transp')return Math.max(0,(5-n.sat_transp)/4*100);
+  return n.score;
+}
+
+function scoreColor(v, a=1){
+  const t = Math.max(0,Math.min(1,(v-10)/70));
+  let r,g,b;
+  if(t<0.5){const u=t*2;r=Math.round(29+u*196);g=Math.round(158+u*9);b=Math.round(117-u*94);}
+  else{const u=(t-.5)*2;r=Math.round(225+u*2);g=Math.round(167-u*141);b=23;}
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function npos(n){return {x:n.x*W, y:n.y*H};}
+function nrad(n){const s=getScore(n);return 9+s/100*17;}
+
+function getNodeAt(mx,my){
+  for(const n of NODES){
+    const p=npos(n),r=nrad(n)+5;
+    if((mx-p.x)**2+(my-p.y)**2<r**2) return n.id;
+  }
+  return null;
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const edges=EDGES[emode]||[];
+  const ns=selected!==null?new Set(edges.filter(e=>e[0]===selected||e[1]===selected).flatMap(e=>[e[0],e[1]])):null;
+
+  edges.forEach(([a,b,w])=>{
+    const na=nodeMap[a],nb=nodeMap[b];
+    if(!na||!nb)return;
+    const pa=npos(na),pb=npos(nb);
+    const conn=ns&&(a===selected||b===selected);
+    const alpha=ns?(conn?1:0.06):0.5;
+    const sv=getScore(na)*0.5+getScore(nb)*0.5;
+    const edgeRed=emode==='brecha'||(sv>50&&emode==='vecino');
+    const col=edgeRed
+      ?`rgba(226,75,74,${(0.2+w*.55)*alpha})`
+      :`rgba(90,100,115,${(0.15+w*.45)*alpha})`;
+    ctx.beginPath();ctx.moveTo(pa.x,pa.y);
+    if(emode==='transp'){
+      const mx=(pa.x+pb.x)/2,my=(pa.y+pb.y)/2-15;
+      ctx.quadraticCurveTo(mx,my,pb.x,pb.y);
+    }else ctx.lineTo(pb.x,pb.y);
+    ctx.strokeStyle=col;ctx.lineWidth=0.4+w*2.6;ctx.stroke();
+    if(showW&&conn){
+      ctx.fillStyle=`rgba(180,185,195,${alpha*.85})`;
+      ctx.font='9px sans-serif';ctx.textAlign='center';
+      ctx.fillText(Math.round(w*100),(pa.x+pb.x)/2,(pa.y+pb.y)/2-5);
+    }
+  });
+
+  NODES.forEach(n=>{
+    const p=npos(n),r=nrad(n);
+    const isSel=n.id===selected,isHov=n.id===hovered;
+    const isN=ns&&ns.has(n.id)&&n.id!==selected;
+    const dim=selected!==null&&!isSel&&!isN;
+    const sv=getScore(n);
+    ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
+    ctx.fillStyle=scoreColor(sv,dim?0.14:0.90);ctx.fill();
+    if(isSel){
+      ctx.beginPath();ctx.arc(p.x,p.y,r+5,0,Math.PI*2);
+      ctx.strokeStyle=scoreColor(sv,0.9);ctx.lineWidth=2.5;ctx.stroke();
+    }else if(isHov){
+      ctx.beginPath();ctx.arc(p.x,p.y,r+3,0,Math.PI*2);
+      ctx.strokeStyle=scoreColor(sv,0.6);ctx.lineWidth=1.5;ctx.stroke();
+    }
+    const fs=Math.max(8,r*.5);
+    ctx.font=`${isSel?'600 ':''}${fs}px 'Segoe UI',sans-serif`;
+    ctx.fillStyle=`rgba(255,255,255,${dim?0.14:0.90})`;
+    ctx.textAlign='center';
+    const short=n.name.length>10?n.name.split('-')[0].split(' ')[0]:n.name;
+    ctx.fillText(short,p.x,p.y+r+12);
+    if(!dim){
+      ctx.font=`500 ${Math.max(7,r*.44)}px sans-serif`;
+      ctx.fillStyle='rgba(255,255,255,.78)';
+      const lbl=vmode==='brecha'?(sv>=0?'+':'')+Math.round(n.brecha)+'pp':Math.round(sv)+'%';
+      ctx.fillText(lbl,p.x,p.y+4);
+    }
+  });
+}
+
+function setSpaceSecurity(val, label){
+  const pct = Math.min(100, Math.max(0, (val-1)/4*100));
+  return {pct, label: val?val.toFixed(1)+'/5':'N/D'};
+}
+
+function showDetail(id){
+  document.getElementById('emp').style.display=id===null?'':'none';
+  document.getElementById('det').style.display=id===null?'none':'';
+  if(id===null)return;
+  const n=nodeMap[id];
+  document.getElementById('ph-title').textContent='UPL '+n.id+' — '+n.name;
+  document.getElementById('d-name').textContent=n.name;
+  document.getElementById('d-sub').textContent='Localidad: '+n.loc+' · UPL '+n.id+' · NSE: '+n.nse.toFixed(1);
+
+  const bd=document.getElementById('d-badges');bd.innerHTML='';
+  if(n.score>=60)bd.innerHTML+='<span class="badge br">Alto riesgo</span>';
+  else if(n.score>=40)bd.innerHTML+='<span class="badge ba">Riesgo medio</span>';
+  else bd.innerHTML+='<span class="badge bg">Bajo riesgo</span>';
+  if(n.brecha>=20)bd.innerHTML+='<span class="badge bp">Brecha crítica</span>';
+  else if(n.brecha>=12)bd.innerHTML+='<span class="badge bp">Brecha alta</span>';
+  if(n.n_vic>0)bd.innerHTML+=`<span class="badge bt">${n.n_vic} encuestados vic.</span>`;
+
+  document.getElementById('d-m').textContent=n.mujer+'%';
+  document.getElementById('b-m').style.width=n.mujer+'%';
+  document.getElementById('d-h').textContent=n.hombre+'%';
+  document.getElementById('b-h').style.width=n.hombre+'%';
+  const dbr=document.getElementById('d-br');
+  dbr.textContent=(n.brecha>=0?'+':'')+n.brecha+' pp';
+  dbr.style.color=n.brecha>=20?'#F48A8A':n.brecha>=10?'#F0A854':'#56D364';
+
+  document.getElementById('d-t').textContent=n.temor+'%';document.getElementById('b-t').style.width=n.temor+'%';
+  document.getElementById('d-i').textContent=n.irresp+'%';document.getElementById('b-i').style.width=n.irresp+'%';
+  document.getElementById('d-a').textContent=n.agres+'%';document.getElementById('b-a').style.width=n.agres+'%';
+  document.getElementById('d-v').textContent=n.inseg>0?n.inseg.toFixed(1)+'%':'N/D';
+
+  const spaceFn=(v)=>v>0?v.toFixed(1)+'/5':'N/D';
+  const spacePct=(v)=>v>0?Math.min(100,(v-1)/4*100):0;
+  document.getElementById('d-par').textContent=spaceFn(n.par_seg);document.getElementById('b-par').style.width=spacePct(n.par_seg)+'%';
+  document.getElementById('d-puen').textContent=spaceFn(n.puen_seg);document.getElementById('b-puen').style.width=spacePct(n.puen_seg)+'%';
+  document.getElementById('d-cicl').textContent=spaceFn(n.cicl_seg);document.getElementById('b-cicl').style.width=spacePct(n.cicl_seg)+'%';
+  document.getElementById('d-call').textContent=spaceFn(n.call_seg);
+
+  document.getElementById('d-med').textContent=n.medio_dom||'N/D';
+  const st=n.sat_transp>0?n.sat_transp.toFixed(1)+'/5':'N/D';
+  document.getElementById('d-st').textContent=st;document.getElementById('b-st').style.width=(n.sat_transp/5*100)+'%';
+  const sp=n.sat_parques>0?n.sat_parques.toFixed(1)+'/5':'N/D';
+  document.getElementById('d-sp').textContent=sp;document.getElementById('b-sp').style.width=(n.sat_parques/5*100)+'%';
+  document.getElementById('d-nse').textContent=n.nse.toFixed(1)+' / 6';
+  document.getElementById('d-n').textContent=(n.n_vic+n.n_gen+n.n_mov).toLocaleString()+' registros';
+
+  const bc=document.getElementById('d-barrios');
+  if(n.barrios&&n.barrios.length>0){
+    const maxIns=Math.max(...n.barrios.map(b=>b.inseg));
+    bc.innerHTML=n.barrios.slice(0,8).map(b=>{
+      const col=b.inseg>60?'#E24B4A':b.inseg>35?'#EF9F27':'#1D9E75';
+      const pct=maxIns>0?b.inseg/maxIns*100:50;
+      return `<div class="bcard">
+        <div class="bcard-name">${b.name}</div>
+        <div class="bcard-sub">Victimización: ${b.inseg.toFixed(1)}% · n=${b.n}</div>
+        <div class="bbar"><div class="bbf" style="width:${pct.toFixed(1)}%;background:${col}"></div></div>
+      </div>`;
+    }).join('');
+  }else{
+    bc.innerHTML='<div style="font-size:11px;color:#484F58">Sin datos de barrios para esta UPL</div>';
+  }
+}
+
+function setView(v,btn){
+  vmode=v;draw();showDetail(selected);
+  document.querySelectorAll('button.tb').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+canvas.addEventListener('mousemove',e=>{
+  const r=canvas.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*W/r.width,my=(e.clientY-r.top)*H/r.height;
+  const id=getNodeAt(mx,my);
+  if(id!==hovered){hovered=id;canvas.className=id!==null?'hover':'';draw();}
+  if(id!==null){
+    const n=nodeMap[id];const sv=getScore(n);
+    tt.style.display='block';
+    tt.style.left=(e.clientX-r.left+14)+'px';
+    tt.style.top=(e.clientY-r.top-32)+'px';
+    tt.textContent=n.name+' ('+n.loc+') · '+Math.round(sv)+(vmode==='brecha'?'pp':'%');
+  }else tt.style.display='none';
+});
+canvas.addEventListener('mouseleave',()=>{tt.style.display='none';});
+canvas.addEventListener('click',e=>{
+  const r=canvas.getBoundingClientRect();
+  const id=getNodeAt((e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height);
+  selected=id===selected?null:id;
+  showDetail(selected);draw();
+});
+document.getElementById('esel').addEventListener('change',e=>{emode=e.target.value;draw();});
+
+function resize(){
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.getBoundingClientRect();
+  W=rect.width;H=rect.height;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  ctx.scale(dpr,dpr);draw();
+}
+window.addEventListener('resize',resize);
+setTimeout(resize,60);
+</script>
+</body>
+</html>

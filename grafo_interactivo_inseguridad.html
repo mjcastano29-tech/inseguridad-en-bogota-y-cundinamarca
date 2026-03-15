@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grafo Inseguridad Bogotá — Reto 3</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0D1117;color:#E6EDF3;height:100vh;display:flex;flex-direction:column}
+#top{padding:10px 16px;border-bottom:1px solid #21262D;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+#top h1{font-size:14px;font-weight:600;color:#F0F6FF;white-space:nowrap}
+select{font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid #30363D;background:#161B22;color:#E6EDF3;cursor:pointer}
+label{font-size:12px;color:#8B949E}
+#main{display:flex;flex:1;overflow:hidden;min-height:0}
+#canvas-wrap{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%;cursor:crosshair}
+canvas.hover{cursor:pointer}
+#panel{width:280px;flex-shrink:0;border-left:1px solid #21262D;display:flex;flex-direction:column;overflow-y:auto;background:#161B22}
+#panel-header{padding:12px 14px;border-bottom:1px solid #21262D;font-size:12px;font-weight:600;color:#8B949E;text-transform:uppercase;letter-spacing:.05em}
+#panel-body{padding:14px;flex:1}
+#empty{color:#484F58;font-size:13px;line-height:1.7;padding:8px 0}
+.node-title{font-size:16px;font-weight:600;color:#F0F6FF;line-height:1.3}
+.node-sub{font-size:12px;color:#8B949E;margin-top:3px}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.badge{font-size:11px;font-weight:500;padding:2px 9px;border-radius:99px}
+.badge-red{background:#3D1B1B;color:#F48A8A}
+.badge-amber{background:#2D1F0A;color:#F0A854}
+.badge-green{background:#0D2611;color:#56D364}
+.badge-purple{background:#1E1B3A;color:#A78BFA}
+.section{margin-top:16px}
+.section-title{font-size:11px;font-weight:600;color:#8B949E;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #21262D;font-size:12px}
+.stat-row:last-child{border-bottom:none}
+.stat-label{color:#8B949E}
+.stat-val{font-weight:500;color:#E6EDF3}
+.bar{height:5px;background:#21262D;border-radius:3px;overflow:hidden;margin-top:2px}
+.bar-fill{height:100%;border-radius:3px;transition:width .4s ease}
+.neigh-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#8B949E;margin:2px 3px 2px 0}
+.neigh-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ask-btn{margin-top:14px;width:100%;padding:7px 12px;font-size:12px;border-radius:6px;border:1px solid #30363D;background:#21262D;color:#E6EDF3;cursor:pointer;text-align:left;transition:background .15s}
+.ask-btn:hover{background:#2D333B}
+#legend{padding:12px 14px;border-top:1px solid #21262D}
+.legend-title{font-size:11px;font-weight:600;color:#8B949E;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.leg-row{display:flex;align-items:center;gap:7px;font-size:11px;color:#8B949E;margin-top:4px}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.leg-line{width:22px;height:2px;border-radius:1px;flex-shrink:0}
+#tooltip{position:absolute;background:#161B22;border:1px solid #30363D;border-radius:6px;padding:6px 10px;font-size:11px;color:#E6EDF3;pointer-events:none;display:none;z-index:10;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="top">
+  <h1>Red de Inseguridad · Bogotá</h1>
+  <label>Vista: <select id="view-sel">
+    <option value="total">Inseguridad global</option>
+    <option value="mujer">Mujeres</option>
+    <option value="hombre">Hombres</option>
+    <option value="brecha">Brecha de género</option>
+  </select></label>
+  <label>Aristas: <select id="edge-sel">
+    <option value="vecino">Vecindad geográfica</option>
+    <option value="similar">Similitud de perfil</option>
+    <option value="ruta">Rutas principales</option>
+  </select></label>
+  <label style="margin-left:auto;display:flex;align-items:center;gap:6px">
+    <input type="checkbox" id="show-weights" checked> Mostrar pesos
+  </label>
+</div>
+<div id="main">
+  <div id="canvas-wrap">
+    <canvas id="gc"></canvas>
+    <div id="tooltip"></div>
+  </div>
+  <div id="panel">
+    <div id="panel-header">Detalle de localidad</div>
+    <div id="panel-body">
+      <div id="empty">Haz clic en una localidad para explorar sus indicadores de inseguridad por género</div>
+      <div id="detail" style="display:none">
+        <div class="node-title" id="d-name"></div>
+        <div class="node-sub" id="d-zone"></div>
+        <div class="badges" id="d-badges"></div>
+        <div class="section">
+          <div class="section-title">Indicadores</div>
+          <div class="stat-row"><span class="stat-label">Temor en entorno</span><span class="stat-val" id="d-temor"></span></div>
+          <div class="bar"><div class="bar-fill" id="b-temor" style="background:#E24B4A"></div></div>
+          <div class="stat-row" style="margin-top:6px"><span class="stat-label">Irrespeto calle/transporte</span><span class="stat-val" id="d-irresp"></span></div>
+          <div class="bar"><div class="bar-fill" id="b-irresp" style="background:#BA7517"></div></div>
+          <div class="stat-row" style="margin-top:6px"><span class="stat-label">Agresión física/verbal</span><span class="stat-val" id="d-agres"></span></div>
+          <div class="bar"><div class="bar-fill" id="b-agres" style="background:#7C3AED"></div></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Por género</div>
+          <div class="stat-row"><span class="stat-label">Mujeres</span><span class="stat-val" id="d-mujer" style="color:#F48A8A"></span></div>
+          <div class="bar"><div class="bar-fill" id="b-mujer" style="background:#E24B4A"></div></div>
+          <div class="stat-row" style="margin-top:6px"><span class="stat-label">Hombres</span><span class="stat-val" id="d-hombre" style="color:#79C0FF"></span></div>
+          <div class="bar"><div class="bar-fill" id="b-hombre" style="background:#1F6FEB"></div></div>
+          <div class="stat-row" style="margin-top:6px"><span class="stat-label">Brecha (M − H)</span><span class="stat-val" id="d-brecha"></span></div>
+          <div class="stat-row"><span class="stat-label">NSE promedio</span><span class="stat-val" id="d-nse"></span></div>
+          <div class="stat-row"><span class="stat-label">Encuestados</span><span class="stat-val" id="d-n"></span></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Localidades conectadas</div>
+          <div id="d-neighbors"></div>
+        </div>
+        <button class="ask-btn" id="ask-btn">Analizar políticas para esta zona ↗</button>
+      </div>
+    </div>
+    <div id="legend">
+      <div class="legend-title">Leyenda</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#E24B4A"></div> Alta inseguridad</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#EF9F27"></div> Inseguridad media</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#1D9E75"></div> Inseguridad baja</div>
+      <div class="leg-row" style="margin-top:6px"><div class="leg-line" style="background:#E24B4A;opacity:.7"></div> Ruta / alta similitud</div>
+      <div class="leg-row"><div class="leg-line" style="background:#484F58"></div> Conexión vecinal</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const NODES = [{"id": 0, "name": "La Candelaria", "zone": "Centro", "x": 0.48, "y": 0.36, "temor": 34.6, "irresp": 44.5, "agres": 38.9, "mujer": 5191.3, "hombre": 2733.5, "brecha": 2457.8, "nse": 2.5, "n": 393}, {"id": 1, "name": "Tunjuelito", "zone": "Sur", "x": 0.5, "y": 0.62, "temor": 30.4, "irresp": 32.5, "agres": 19.4, "mujer": 3192.0, "hombre": 2085.6, "brecha": 1106.4, "nse": 2.3, "n": 625}, {"id": 2, "name": "Bosa", "zone": "Suroccidente", "x": 0.3, "y": 0.72, "temor": 28.7, "irresp": 39.4, "agres": 25.6, "mujer": 3590.0, "hombre": 2399.7, "brecha": 1190.3, "nse": 1.9, "n": 889}, {"id": 3, "name": "Teusaquillo", "zone": "Centro", "x": 0.44, "y": 0.32, "temor": 28.3, "irresp": 46.4, "agres": 37.1, "mujer": 4899.4, "hombre": 2537.3, "brecha": 2362.1, "nse": 3.2, "n": 618}, {"id": 4, "name": "Los Martires", "zone": "Centro", "x": 0.45, "y": 0.42, "temor": 28.2, "irresp": 36.1, "agres": 29.0, "mujer": 3752.6, "hombre": 2328.3, "brecha": 1424.3, "nse": 2.9, "n": 521}, {"id": 5, "name": "Antonio Nariño", "zone": "Suroriente", "x": 0.52, "y": 0.5, "temor": 25.3, "irresp": 33.7, "agres": 27.7, "mujer": 3308.3, "hombre": 2471.7, "brecha": 836.6, "nse": 2.8, "n": 483}, {"id": 6, "name": "Usme", "zone": "Sur", "x": 0.65, "y": 0.68, "temor": 24.8, "irresp": 32.1, "agres": 22.2, "mujer": 3580.9, "hombre": 1857.7, "brecha": 1723.2, "nse": 1.8, "n": 757}, {"id": 7, "name": "San Cristobal", "zone": "Suroriente", "x": 0.6, "y": 0.48, "temor": 24.4, "irresp": 31.6, "agres": 26.3, "mujer": 3397.4, "hombre": 1937.7, "brecha": 1459.7, "nse": 2.2, "n": 753}, {"id": 8, "name": "Fontibon", "zone": "Occidente", "x": 0.22, "y": 0.4, "temor": 23.6, "irresp": 42.7, "agres": 28.5, "mujer": 3876.9, "hombre": 2257.6, "brecha": 1619.3, "nse": 2.9, "n": 783}, {"id": 9, "name": "Puente Aranda", "zone": "Occidente", "x": 0.38, "y": 0.45, "temor": 21.8, "irresp": 34.2, "agres": 25.8, "mujer": 3253.6, "hombre": 2271.8, "brecha": 981.8, "nse": 2.9, "n": 698}, {"id": 10, "name": "Santa Fe", "zone": "Centro", "x": 0.5, "y": 0.3, "temor": 20.2, "irresp": 32.9, "agres": 27.6, "mujer": 3512.1, "hombre": 1862.3, "brecha": 1649.8, "nse": 2.5, "n": 554}, {"id": 11, "name": "Engativa", "zone": "Noroccidente", "x": 0.25, "y": 0.28, "temor": 19.8, "irresp": 42.4, "agres": 26.8, "mujer": 3759.0, "hombre": 1674.0, "brecha": 2085.0, "nse": 3.3, "n": 956}, {"id": 12, "name": "Barrios Unidos", "zone": "Centro-Norte", "x": 0.42, "y": 0.24, "temor": 19.7, "irresp": 30.2, "agres": 23.4, "mujer": 2766.3, "hombre": 2062.1, "brecha": 704.2, "nse": 3.2, "n": 719}, {"id": 13, "name": "Suba", "zone": "Norte", "x": 0.35, "y": 0.12, "temor": 18.4, "irresp": 28.3, "agres": 16.2, "mujer": 2880.2, "hombre": 1166.7, "brecha": 1713.5, "nse": 3.0, "n": 955}, {"id": 14, "name": "Rafael Uribe Uribe", "zone": "Sur", "x": 0.54, "y": 0.58, "temor": 17.9, "irresp": 23.5, "agres": 14.8, "mujer": 2622.0, "hombre": 1296.8, "brecha": 1325.2, "nse": 2.4, "n": 844}, {"id": 15, "name": "Ciudad Bolivar", "zone": "Sur", "x": 0.42, "y": 0.8, "temor": 17.9, "irresp": 39.1, "agres": 25.1, "mujer": 3068.7, "hombre": 2180.3, "brecha": 888.4, "nse": 1.3, "n": 837}, {"id": 16, "name": "Chapinero", "zone": "Norte-Centro", "x": 0.55, "y": 0.18, "temor": 15.3, "irresp": 27.7, "agres": 20.2, "mujer": 2734.5, "hombre": 1649.9, "brecha": 1084.6, "nse": 4.1, "n": 647}, {"id": 17, "name": "Usaquen", "zone": "Norte", "x": 0.62, "y": 0.08, "temor": 11.0, "irresp": 24.1, "agres": 17.1, "mujer": 2243.6, "hombre": 1188.7, "brecha": 1054.9, "nse": 3.9, "n": 847}, {"id": 18, "name": "Kennedy", "zone": "Occidente", "x": 0.28, "y": 0.55, "temor": 9.0, "irresp": 20.1, "agres": 11.4, "mujer": 2025.3, "hombre": 659.6, "brecha": 1365.7, "nse": 2.7, "n": 983}, {"id": 19, "name": "Sumapaz", "zone": "Sur rural", "x": 0.58, "y": 0.9, "temor": 6.0, "irresp": 13.0, "agres": 9.0, "mujer": 1759.3, "hombre": 0.0, "brecha": 1759.3, "nse": 1.6, "n": 100}];
+const EDGES = {
+  vecino:  [[17, 16, 0.9], [17, 13, 0.85], [16, 10, 0.85], [16, 12, 0.8], [16, 3, 0.75], [10, 3, 0.7], [10, 0, 0.9], [10, 4, 0.75], [7, 5, 0.85], [7, 14, 0.8], [7, 10, 0.65], [6, 1, 0.75], [6, 14, 0.7], [6, 19, 0.6], [1, 2, 0.7], [1, 14, 0.8], [2, 18, 0.85], [2, 15, 0.8], [18, 8, 0.75], [18, 9, 0.8], [18, 1, 0.7], [8, 11, 0.8], [8, 9, 0.7], [11, 13, 0.75], [11, 12, 0.7], [13, 12, 0.65], [12, 3, 0.8], [3, 9, 0.7], [3, 4, 0.75], [4, 0, 0.85], [4, 5, 0.7], [5, 14, 0.75], [9, 4, 0.65], [0, 10, 0.9], [14, 15, 0.7], [15, 2, 0.75]],
+  similar: [[0, 1, 0.94], [0, 2, 0.99], [0, 3, 0.99], [0, 4, 1.0], [0, 5, 1.0], [0, 6, 0.99], [0, 7, 1.0], [0, 8, 0.98], [0, 9, 1.0], [0, 10, 0.99], [0, 11, 0.96], [0, 12, 1.0], [0, 13, 0.96], [0, 14, 0.96], [0, 15, 0.96], [0, 16, 0.99], [0, 17, 0.96], [0, 18, 0.91], [1, 2, 0.98], [1, 3, 0.92], [1, 4, 0.96], [1, 5, 0.95], [1, 6, 0.98], [1, 7, 0.96], [1, 8, 0.92], [1, 9, 0.94], [1, 10, 0.91], [1, 11, 0.89], [1, 12, 0.94], [1, 13, 0.98], [1, 14, 1.0], [1, 15, 0.88], [1, 16, 0.92], [1, 18, 0.88], [2, 3, 0.98], [2, 4, 0.99], [2, 5, 0.99], [2, 6, 1.0], [2, 7, 0.99], [2, 8, 0.98], [2, 9, 0.99], [2, 10, 0.97], [2, 11, 0.97], [2, 12, 0.99], [2, 13, 1.0], [2, 14, 0.99], [2, 15, 0.96], [2, 16, 0.98], [2, 17, 0.95], [2, 18, 0.95], [3, 4, 0.99], [3, 5, 0.99], [3, 6, 0.97], [3, 7, 0.99], [3, 8, 0.99], [3, 9, 1.0], [3, 10, 1.0], [3, 11, 0.99], [3, 12, 1.0], [3, 13, 0.96], [3, 14, 0.93], [3, 15, 0.99], [3, 16, 1.0], [3, 17, 0.99], [3, 18, 0.94], [4, 5, 1.0], [4, 6, 0.99], [4, 7, 1.0], [4, 8, 0.98], [4, 9, 0.99], [4, 10, 0.99], [4, 11, 0.96], [4, 12, 1.0], [4, 13, 0.98], [4, 14, 0.97], [4, 15, 0.96], [4, 16, 0.98], [4, 17, 0.96], [4, 18, 0.91], [5, 6, 0.99], [5, 7, 1.0], [5, 8, 0.98], [5, 9, 1.0], [5, 10, 0.99], [5, 11, 0.96], [5, 12, 1.0], [5, 13, 0.97], [5, 14, 0.97], [5, 15, 0.96], [5, 16, 0.99], [5, 17, 0.96], [5, 18, 0.91], [6, 7, 0.99], [6, 8, 0.97], [6, 9, 0.99], [6, 10, 0.97], [6, 11, 0.95], [6, 12, 0.99], [6, 13, 0.99], [6, 14, 0.99], [6, 15, 0.95], [6, 16, 0.97], [6, 17, 0.94], [6, 18, 0.92], [7, 8, 0.98], [7, 9, 0.99], [7, 10, 0.99], [7, 11, 0.95], [7, 12, 1.0], [7, 13, 0.97], [7, 14, 0.97], [7, 15, 0.95], [7, 16, 0.98], [7, 17, 0.95], [7, 18, 0.9], [8, 9, 0.99], [8, 10, 0.99], [8, 11, 1.0], [8, 12, 0.99], [8, 13, 0.97], [8, 14, 0.94], [8, 15, 1.0], [8, 16, 1.0], [8, 17, 0.99], [8, 18, 0.97], [9, 10, 1.0], [9, 11, 0.98], [9, 12, 1.0], [9, 13, 0.97], [9, 14, 0.96], [9, 15, 0.98], [9, 16, 1.0], [9, 17, 0.98], [9, 18, 0.94], [10, 11, 0.98], [10, 12, 1.0], [10, 13, 0.95], [10, 14, 0.93], [10, 15, 0.98], [10, 16, 1.0], [10, 17, 0.98], [10, 18, 0.92], [11, 12, 0.98], [11, 13, 0.96], [11, 14, 0.91], [11, 15, 1.0], [11, 16, 0.99], [11, 17, 1.0], [11, 18, 0.98], [12, 13, 0.97], [12, 14, 0.96], [12, 15, 0.97], [12, 16, 1.0], [12, 17, 0.98], [12, 18, 0.93], [13, 14, 0.99], [13, 15, 0.95], [13, 16, 0.97], [13, 17, 0.94], [13, 18, 0.96], [14, 15, 0.91], [14, 16, 0.94], [14, 17, 0.89], [14, 18, 0.91], [15, 16, 0.99], [15, 17, 1.0], [15, 18, 0.98], [16, 17, 0.99], [16, 18, 0.95], [17, 18, 0.96]],
+  ruta:    [[13, 17, 0.95], [17, 16, 0.9], [16, 12, 0.85], [12, 3, 0.88], [3, 4, 0.9], [4, 0, 0.95], [0, 10, 0.9], [11, 12, 0.8], [11, 8, 0.8], [8, 18, 0.88], [18, 2, 0.9], [2, 15, 0.85], [7, 5, 0.82], [5, 4, 0.88], [14, 1, 0.82], [1, 6, 0.78], [9, 18, 0.75], [9, 4, 0.78]],
+};
+
+const canvas = document.getElementById('gc');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+let W, H, selected = null, hovered = null;
+let viewMode = 'total', edgeMode = 'vecino', showWeights = true;
+
+function getScore(n){
+  if(viewMode==='mujer')  return n.mujer;
+  if(viewMode==='hombre') return n.hombre;
+  if(viewMode==='brecha') return n.brecha;
+  return +(n.temor*0.30 + n.irresp*0.35 + n.agres*0.35).toFixed(1);
+}
+
+function scoreColor(score, mode, alpha=1){
+  let r,g,b;
+  if(mode==='brecha'){
+    const t = Math.max(0,Math.min(1,(score)/40));
+    r=Math.round(30+t*196); g=Math.round(158-t*108); b=Math.round(220-t*180);
+  } else {
+    const t = Math.max(0,Math.min(1,(score-15)/65));
+    if(t<0.5){ const u=t*2; r=Math.round(29+u*196);g=Math.round(158+u*9);b=Math.round(117-u*94); }
+    else { const u=(t-.5)*2; r=Math.round(225+u*2);g=Math.round(167-u*141);b=Math.round(23); }
+  }
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function npos(n){ return {x:n.x*W, y:n.y*H}; }
+function nrad(n){
+  const s = getScore(n);
+  const ref = viewMode==='brecha' ? Math.max(s,0) : s;
+  return 11 + ref/100*18;
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const edges = EDGES[edgeMode];
+  const neighSet = selected!==null
+    ? new Set(edges.filter(e=>e[0]===selected||e[1]===selected).flatMap(e=>[e[0],e[1]]))
+    : null;
+
+  edges.forEach(([a,b,w])=>{
+    const pa=npos(NODES[a]), pb=npos(NODES[b]);
+    const isConn = neighSet && (a===selected||b===selected);
+    const alpha = neighSet ? (isConn?1:0.08) : 0.55;
+    const lw = edgeMode==='ruta' ? 0.8+w*3 : 0.5+w*2;
+    const col = edgeMode==='ruta'
+      ? `rgba(226,75,74,${(0.2+w*0.6)*alpha})`
+      : `rgba(100,100,110,${(0.2+w*0.5)*alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(pa.x,pa.y);
+    if(edgeMode==='ruta'){
+      const mx=(pa.x+pb.x)/2, my=(pa.y+pb.y)/2-20;
+      ctx.quadraticCurveTo(mx,my,pb.x,pb.y);
+    } else ctx.lineTo(pb.x,pb.y);
+    ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.stroke();
+
+    if(showWeights && (isConn||(neighSet===null&&w>=0.85))){
+      const mx=(pa.x+pb.x)/2, my=(pa.y+pb.y)/2-7;
+      ctx.fillStyle=`rgba(180,180,190,${alpha*0.9})`;
+      ctx.font='10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(Math.round(w*100), mx, my);
+    }
+  });
+
+  NODES.forEach(n=>{
+    const {x,y}=npos(n), r=nrad(n);
+    const isSel=n.id===selected, isHov=n.id===hovered;
+    const isNeigh=neighSet&&neighSet.has(n.id)&&n.id!==selected;
+    const dimmed=selected!==null&&!isSel&&!isNeigh;
+    const score=getScore(n);
+    const alpha=dimmed?0.18:0.90;
+
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=scoreColor(score,viewMode,alpha); ctx.fill();
+
+    if(isSel){
+      ctx.beginPath(); ctx.arc(x,y,r+5,0,Math.PI*2);
+      ctx.strokeStyle=scoreColor(score,viewMode,0.9);
+      ctx.lineWidth=2.5; ctx.stroke();
+    } else if(isHov){
+      ctx.beginPath(); ctx.arc(x,y,r+3,0,Math.PI*2);
+      ctx.strokeStyle=scoreColor(score,viewMode,0.7);
+      ctx.lineWidth=1.5; ctx.stroke();
+    }
+
+    const fs=Math.max(9, r*0.52);
+    ctx.font=`${isSel?'600 ':''}${fs}px 'Segoe UI',sans-serif`;
+    ctx.fillStyle=`rgba(255,255,255,${dimmed?0.2:0.92})`;
+    ctx.textAlign='center';
+    const short=n.name.split(' ')[0];
+    ctx.fillText(short, x, y+r+14);
+
+    if(!dimmed){
+      ctx.font=`500 ${Math.max(8,r*0.48)}px 'Segoe UI',sans-serif`;
+      ctx.fillStyle='rgba(255,255,255,0.80)';
+      ctx.fillText(Math.round(score)+'%', x, y+4);
+    }
+  });
+}
+
+function getNodeAt(mx,my){
+  for(const n of NODES){
+    const {x,y}=npos(n); const r=nrad(n)+5;
+    if((mx-x)**2+(my-y)**2<r**2) return n.id;
+  }
+  return null;
+}
+
+function showDetail(id){
+  const empty=document.getElementById('empty');
+  const detail=document.getElementById('detail');
+  if(id===null){ empty.style.display=''; detail.style.display='none'; return; }
+  empty.style.display='none'; detail.style.display='';
+  const n=NODES[id];
+  document.getElementById('d-name').textContent=n.name;
+  document.getElementById('d-zone').textContent=`Zona: ${n.zone}  ·  NSE: ${n.nse.toFixed(1)}  ·  n=${n.n}`;
+
+  const total=+(n.temor*.30+n.irresp*.35+n.agres*.35).toFixed(1);
+  const b=document.getElementById('d-badges');
+  b.innerHTML='';
+  if(total>=60) b.innerHTML+='<span class="badge badge-red">Alto riesgo</span>';
+  else if(total>=45) b.innerHTML+='<span class="badge badge-amber">Riesgo medio</span>';
+  else b.innerHTML+='<span class="badge badge-green">Riesgo bajo</span>';
+  if(n.brecha>=20) b.innerHTML+='<span class="badge badge-purple">Brecha alta</span>';
+  if(n.brecha>=30) b.innerHTML+='<span class="badge badge-red">Brecha crítica</span>';
+
+  document.getElementById('d-temor').textContent=n.temor+'%';
+  document.getElementById('b-temor').style.width=n.temor+'%';
+  document.getElementById('d-irresp').textContent=n.irresp+'%';
+  document.getElementById('b-irresp').style.width=n.irresp+'%';
+  document.getElementById('d-agres').textContent=n.agres+'%';
+  document.getElementById('b-agres').style.width=n.agres+'%';
+  document.getElementById('d-mujer').textContent=n.mujer+'%';
+  document.getElementById('b-mujer').style.width=n.mujer+'%';
+  document.getElementById('d-hombre').textContent=n.hombre+'%';
+  document.getElementById('b-hombre').style.width=n.hombre+'%';
+
+  const bEl=document.getElementById('d-brecha');
+  bEl.textContent=(n.brecha>=0?'+':'')+n.brecha+' pp';
+  bEl.style.color=n.brecha>=25?'#F48A8A':n.brecha>=12?'#F0A854':'#56D364';
+  document.getElementById('d-nse').textContent=n.nse.toFixed(1);
+  document.getElementById('d-n').textContent=n.n.toLocaleString();
+
+  const edges=EDGES[edgeMode];
+  const neighs=edges.filter(e=>e[0]===id||e[1]===id);
+  const nl=document.getElementById('d-neighbors');
+  nl.innerHTML=neighs.map(e=>{
+    const ni=e[0]===id?e[1]:e[0];
+    const nn=NODES[ni]; const w=Math.round(e[2]*100);
+    const sc=getScore(nn);
+    return `<span class="neigh-chip"><span class="neigh-dot" style="background:${scoreColor(sc,viewMode,1)}"></span>${nn.name} <span style="color:#484F58;font-size:10px">${w}</span></span>`;
+  }).join('');
+
+  document.getElementById('ask-btn').onclick=()=>{
+    const msg=`Analiza la situación de inseguridad en ${n.name}, Bogotá (Reto 3 Cámara de Comercio):\n- Temor en entorno: ${n.temor}%\n- Irrespeto en calle/transporte: ${n.irresp}%\n- Agresión física/verbal: ${n.agres}%\n- Score mujeres: ${n.mujer}%, hombres: ${n.hombre}%, brecha: ${n.brecha}pp\n- NSE promedio: ${n.nse}\nSugiere políticas de seguridad integral con perspectiva de género para esta zona.`;
+    console.log('Pregunta generada:', msg);
+    alert('Copia esta pregunta:\n\n' + msg);
+  };
+}
+
+canvas.addEventListener('mousemove', e=>{
+  const r=canvas.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  const id=getNodeAt(mx*W/r.width, my*H/r.height);
+  if(id!==hovered){ hovered=id; canvas.className=id!==null?'hover':''; draw(); }
+  if(id!==null){
+    const n=NODES[id]; const score=getScore(n);
+    tooltip.style.display='block';
+    tooltip.style.left=(e.clientX-r.left+12)+'px';
+    tooltip.style.top=(e.clientY-r.top-30)+'px';
+    tooltip.textContent=`${n.name} · ${viewMode==='brecha'?'Brecha: '+(n.brecha>=0?'+':'')+n.brecha+'pp':'Score: '+Math.round(score)+'%'}`;
+  } else tooltip.style.display='none';
+});
+
+canvas.addEventListener('mouseleave',()=>{ tooltip.style.display='none'; });
+
+canvas.addEventListener('click', e=>{
+  const r=canvas.getBoundingClientRect();
+  const id=getNodeAt((e.clientX-r.left)*W/r.width, (e.clientY-r.top)*H/r.height);
+  selected=id===selected?null:id;
+  showDetail(selected); draw();
+});
+
+document.getElementById('view-sel').addEventListener('change',e=>{
+  viewMode=e.target.value; draw();
+  if(selected!==null) showDetail(selected);
+});
+document.getElementById('edge-sel').addEventListener('change',e=>{
+  edgeMode=e.target.value; draw();
+  if(selected!==null) showDetail(selected);
+});
+document.getElementById('show-weights').addEventListener('change',e=>{
+  showWeights=e.target.checked; draw();
+});
+
+function resize(){
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.getBoundingClientRect();
+  W=rect.width; H=rect.height;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  ctx.scale(dpr,dpr); draw();
+}
+window.addEventListener('resize', resize);
+setTimeout(resize, 60);
+</script>
+</body>
+</html>

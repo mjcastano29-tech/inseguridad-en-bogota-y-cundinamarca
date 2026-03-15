@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grafo Seguridad Bogotá — Mapa</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0D1117;color:#E6EDF3;
+     display:flex;flex-direction:column;height:100vh;overflow:hidden}
+#top{padding:8px 14px;border-bottom:1px solid #21262D;display:flex;align-items:center;
+      gap:8px;flex-wrap:wrap;flex-shrink:0;background:#0D1117;z-index:1000}
+#top h1{font-size:13px;font-weight:600;color:#F0F6FF}
+#top p{font-size:10px;color:#8B949E}
+.tb{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid #30363D;
+     background:#161B22;color:#8B949E;cursor:pointer;transition:all .15s;white-space:nowrap}
+.tb:hover{border-color:#58A6FF;color:#58A6FF}
+.tb.active{background:#1F3A5F;border-color:#1F6FEB;color:#79C0FF;font-weight:500}
+select{font-size:11px;padding:3px 7px;border-radius:6px;border:1px solid #30363D;
+        background:#161B22;color:#E6EDF3;cursor:pointer}
+#main{display:flex;flex:1;min-height:0}
+#map-wrap{flex:1;position:relative;min-width:0}
+#map{width:100%;height:100%}
+#graph-canvas{position:absolute;top:0;left:0;width:100%;height:100%;
+               pointer-events:none;z-index:400}
+#panel{width:290px;flex-shrink:0;border-left:1px solid #21262D;background:#161B22;
+        display:flex;flex-direction:column;overflow-y:auto;z-index:500}
+.ph{padding:9px 13px;border-bottom:1px solid #21262D;font-size:10px;font-weight:600;
+     color:#8B949E;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0}
+.pb{padding:12px;flex:1}
+.empty{color:#484F58;font-size:12px;line-height:1.7}
+.ntitle{font-size:15px;font-weight:600;color:#F0F6FF}
+.nsub{font-size:11px;color:#8B949E;margin-top:2px;line-height:1.5}
+.badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.badge{font-size:10px;font-weight:500;padding:2px 8px;border-radius:99px}
+.br{background:#3D1B1B;color:#F48A8A} .ba{background:#2D1F0A;color:#F0A854}
+.bg{background:#0D2611;color:#56D364} .bp{background:#1E1B3A;color:#A78BFA}
+.bt{background:#0A1F2D;color:#79C0FF}
+.sec{margin-top:12px}
+.st{font-size:10px;font-weight:600;color:#8B949E;text-transform:uppercase;
+     letter-spacing:.06em;margin-bottom:5px}
+.sr{display:flex;justify-content:space-between;align-items:center;padding:3px 0;
+     border-bottom:1px solid #0D1117;font-size:11px}
+.sr:last-child{border:none}
+.sl{color:#8B949E} .sv{font-weight:500;color:#E6EDF3}
+.bar{height:4px;background:#21262D;border-radius:2px;overflow:hidden;margin-top:2px}
+.bf{height:100%;border-radius:2px;transition:width .4s}
+.bcard{background:#0D1117;border:1px solid #21262D;border-radius:5px;
+        padding:6px 9px;margin-bottom:4px}
+.bcard-name{font-size:11px;font-weight:500;color:#E6EDF3}
+.bcard-sub{font-size:10px;color:#8B949E;margin-top:1px}
+.bbar{height:3px;background:#21262D;border-radius:2px;overflow:hidden;margin-top:4px}
+.bbf{height:100%;border-radius:2px}
+.leg{padding:10px 13px;border-top:1px solid #21262D;flex-shrink:0}
+.lt{font-size:10px;font-weight:600;color:#8B949E;text-transform:uppercase;
+     letter-spacing:.06em;margin-bottom:5px}
+.lr{display:flex;align-items:center;gap:5px;font-size:10px;color:#8B949E;margin-top:3px}
+.ld{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ll{width:18px;height:2px;border-radius:1px;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div id="top">
+  <div><h1>Grafo de inseguridad sobre mapa · Bogotá</h1>
+  <p>Fuente: Encuesta de Percepción y Victimización 2025</p></div>
+  <div style="display:flex;gap:5px;flex-wrap:wrap">
+    <button class="tb active" onclick="setView('inseg',this)">Victimización</button>
+    <button class="tb" onclick="setView('mujer',this)">Mujeres</button>
+    <button class="tb" onclick="setView('hombre',this)">Hombres</button>
+    <button class="tb" onclick="setView('brecha',this)">Brecha género</button>
+    <button class="tb" onclick="setView('empeoró',this)">Percepción empeora</button>
+  </div>
+  <div style="display:flex;gap:5px;flex-wrap:wrap">
+    <button class="tb active" id="e-vec"  onclick="toggleEdge('vecino',this)">Vecindad</button>
+    <button class="tb" id="e-rut"  onclick="toggleEdge('ruta',this)">Rutas</button>
+    <button class="tb" id="e-sim"  onclick="toggleEdge('sim',this)">Similitud</button>
+    <button class="tb" id="e-bre"  onclick="toggleEdge('brecha',this)">Brecha</button>
+  </div>
+  <label style="font-size:10px;color:#8B949E;display:flex;align-items:center;gap:4px">
+    <input type="checkbox" id="lblchk" checked onchange="showLabels=this.checked;redrawCanvas()"> Etiquetas
+  </label>
+  <select id="tile-sel" onchange="changeTile(this.value)">
+    <option value="dark">Mapa oscuro</option>
+    <option value="streets">Calles</option>
+    <option value="satellite">Satélite</option>
+    <option value="topo">Topográfico</option>
+  </select>
+</div>
+
+<div id="main">
+  <div id="map-wrap">
+    <div id="map"></div>
+    <canvas id="graph-canvas"></canvas>
+  </div>
+  <div id="panel">
+    <div class="ph" id="ph-t">Selecciona una localidad</div>
+    <div class="pb">
+      <div class="empty" id="emp">
+        Haz clic en un nodo del mapa para explorar:<br><br>
+        · Percepción de inseguridad real<br>
+        · Brecha de género<br>
+        · Espacios públicos más inseguros<br>
+        · Barrios con mayor victimización
+      </div>
+      <div id="det" style="display:none">
+        <div class="ntitle" id="d-name"></div>
+        <div class="nsub"   id="d-sub"></div>
+        <div class="badges" id="d-badges"></div>
+
+        <div class="sec">
+          <div class="st">Percepción de victimización</div>
+          <div class="sr"><span class="sl">Score global</span><span class="sv" id="d-ins"></span></div>
+          <div class="bar"><div class="bf" id="b-ins" style="background:#E24B4A"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Inseguridad empeoró</span><span class="sv" id="d-emp"></span></div>
+        </div>
+
+        <div class="sec">
+          <div class="st">Por género</div>
+          <div class="sr"><span class="sl">Mujeres</span><span class="sv" id="d-m" style="color:#F48A8A"></span></div>
+          <div class="bar"><div class="bf" id="b-m" style="background:#E24B4A"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Hombres</span><span class="sv" id="d-h" style="color:#79C0FF"></span></div>
+          <div class="bar"><div class="bf" id="b-h" style="background:#1F6FEB"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Brecha M−H</span><span class="sv" id="d-br"></span></div>
+        </div>
+
+        <div class="sec">
+          <div class="st">Percepción de espacios públicos</div>
+          <div style="font-size:10px;color:#484F58;margin-bottom:5px">(1=muy seguro · 5=muy inseguro)</div>
+          <div class="sr"><span class="sl">Paraderos SITP</span><span class="sv" id="d-par"></span></div>
+          <div class="bar"><div class="bf" id="b-par" style="background:#BA7517"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Puentes peatonales</span><span class="sv" id="d-puen"></span></div>
+          <div class="bar"><div class="bf" id="b-puen" style="background:#BA7517"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Ciclorutas</span><span class="sv" id="d-cicl"></span></div>
+          <div class="bar"><div class="bf" id="b-cicl" style="background:#1D9E75"></div></div>
+          <div class="sr" style="margin-top:4px"><span class="sl">Calles comerciales</span><span class="sv" id="d-call"></span></div>
+          <div class="bar"><div class="bf" id="b-call" style="background:#7C3AED"></div></div>
+        </div>
+
+        <div class="sec">
+          <div class="st">Barrios más reportados</div>
+          <div id="d-barrios"></div>
+        </div>
+
+        <div class="sec">
+          <div class="st">Zonas conectadas</div>
+          <div id="d-neigh" style="font-size:11px;color:#8B949E;line-height:1.8"></div>
+        </div>
+      </div>
+    </div>
+    <div class="leg">
+      <div class="lt">Leyenda</div>
+      <div class="lr"><div class="ld" style="background:#E24B4A"></div>Alta inseguridad / brecha</div>
+      <div class="lr"><div class="ld" style="background:#EF9F27"></div>Inseguridad media</div>
+      <div class="lr"><div class="ld" style="background:#1D9E75"></div>Inseguridad baja</div>
+      <div class="lr" style="margin-top:4px">
+        <div class="ll" style="background:#E24B4A;opacity:.7"></div>Ruta / brecha alta</div>
+      <div class="lr"><div class="ll" style="background:#484F58"></div>Vecindad / similitud</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const NODES = [{"id": 0, "name": "Usaquen", "zone": "Norte", "lat": 4.7016, "lng": -74.0317, "inseg": 0.0, "mujer": 0.0, "hombre": 0.0, "brecha": 0.0, "empeoró": 0, "par": 0.0, "puen": 0.0, "cicl": 0.0, "call": 0.0, "tipo": "N/D", "n": 0, "barrios": []}, {"id": 1, "name": "Chapinero", "zone": "Norte-Centro", "lat": 4.6473, "lng": -74.0619, "inseg": 51.0, "mujer": 52.0, "hombre": 49.9, "brecha": 2.1, "empeoró": 59.6, "par": 6.4, "puen": 5.2, "cicl": 11.4, "call": 4.5, "tipo": "Estrato bajo", "n": 995, "barrios": [{"name": "Chico", "n": 131, "inseg": 50.5}, {"name": "Chapinero", "n": 82, "inseg": 52.5}, {"name": "San Luis", "n": 64, "inseg": 54.8}, {"name": "Sucre", "n": 60, "inseg": 49.5}, {"name": "Chapinero Alto", "n": 58, "inseg": 46.0}, {"name": "Pardo Rubio", "n": 50, "inseg": 54.8}, {"name": "Virrey", "n": 32, "inseg": 50.1}, {"name": "San Martin", "n": 23, "inseg": 49.3}, {"name": "Bosque Calderón Tejada", "n": 23, "inseg": 50.9}, {"name": "La Cabrera", "n": 21, "inseg": 55.7}]}, {"id": 2, "name": "Santa Fe", "zone": "Centro", "lat": 4.5965, "lng": -74.0765, "inseg": 51.7, "mujer": 53.2, "hombre": 49.7, "brecha": 3.5, "empeoró": 63.9, "par": 5.1, "puen": 7.8, "cicl": 13.4, "call": 5.0, "tipo": "Estrato medio", "n": 912, "barrios": [{"name": "Perseverancia", "n": 97, "inseg": 46.2}, {"name": "San Bernardo", "n": 82, "inseg": 51.4}, {"name": "Las Cruces", "n": 46, "inseg": 52.3}, {"name": "Los Laches", "n": 37, "inseg": 51.5}, {"name": "La Perseverancia", "n": 37, "inseg": 52.4}, {"name": "Sanbernardo", "n": 37, "inseg": 56.9}, {"name": "Samper", "n": 36, "inseg": 59.4}, {"name": "Macarena", "n": 34, "inseg": 54.1}, {"name": "San Martin", "n": 28, "inseg": 53.8}, {"name": "Guavio", "n": 25, "inseg": 42.6}]}, {"id": 3, "name": "San Cristobal", "zone": "Suroriente", "lat": 4.5681, "lng": -74.0862, "inseg": 51.7, "mujer": 53.9, "hombre": 49.4, "brecha": 4.5, "empeoró": 63.8, "par": 3.8, "puen": 7.1, "cicl": 17.4, "call": 5.0, "tipo": "Estrato medio", "n": 1059, "barrios": [{"name": "Nariño Sur", "n": 57, "inseg": 57.5}, {"name": "Santa Ines", "n": 55, "inseg": 54.7}, {"name": "San Isidro", "n": 52, "inseg": 55.3}, {"name": "San Cristóbal Sur", "n": 51, "inseg": 56.4}, {"name": "Santa Inés", "n": 49, "inseg": 51.8}, {"name": "Calvo Sur", "n": 32, "inseg": 58.5}, {"name": "Altavista", "n": 31, "inseg": 65.9}, {"name": "San Vicente", "n": 30, "inseg": 43.3}, {"name": "Nueva Gloria", "n": 27, "inseg": 48.2}, {"name": "San Pedro", "n": 27, "inseg": 54.4}]}, {"id": 4, "name": "Usme", "zone": "Sur", "lat": 4.4792, "lng": -74.1239, "inseg": 51.6, "mujer": 51.8, "hombre": 51.1, "brecha": 0.7, "empeoró": 63.5, "par": 3.7, "puen": 6.5, "cicl": 17.6, "call": 5.7, "tipo": "Estrato medio", "n": 1035, "barrios": [{"name": "Chuniza", "n": 35, "inseg": 56.3}, {"name": "Alfonso López", "n": 34, "inseg": 53.1}, {"name": "Danubio Azul", "n": 33, "inseg": 42.5}, {"name": "Marichuela", "n": 33, "inseg": 51.6}, {"name": "La Fortaleza", "n": 28, "inseg": 54.9}, {"name": "La Aurora", "n": 28, "inseg": 56.1}, {"name": "Porvenir", "n": 26, "inseg": 55.3}, {"name": "Las Violetas", "n": 22, "inseg": 50.2}, {"name": "Virrey", "n": 22, "inseg": 47.0}, {"name": "El Virrey", "n": 21, "inseg": 57.4}]}, {"id": 5, "name": "Tunjuelito", "zone": "Sur", "lat": 4.5633, "lng": -74.1373, "inseg": 52.4, "mujer": 53.7, "hombre": 50.6, "brecha": 3.1, "empeoró": 65.8, "par": 5.4, "puen": 5.5, "cicl": 17.0, "call": 5.0, "tipo": "Estrato medio", "n": 1018, "barrios": [{"name": "Isla Del Sol", "n": 174, "inseg": 49.7}, {"name": "San Carlos", "n": 168, "inseg": 55.1}, {"name": "San Vicente Ferrer", "n": 99, "inseg": 50.6}, {"name": "Tunal", "n": 85, "inseg": 51.2}, {"name": "San Vicente", "n": 59, "inseg": 54.9}, {"name": "San Benito", "n": 51, "inseg": 55.7}, {"name": "Tunjuelito", "n": 41, "inseg": 52.1}, {"name": "Nuevo Muzu", "n": 37, "inseg": 54.2}, {"name": "Fatima", "n": 35, "inseg": 52.5}, {"name": "Santa Lucia", "n": 33, "inseg": 56.8}]}, {"id": 6, "name": "Bosa", "zone": "Suroccidente", "lat": 4.6211, "lng": -74.1955, "inseg": 53.4, "mujer": 54.6, "hombre": 51.6, "brecha": 3.0, "empeoró": 66.7, "par": 4.7, "puen": 5.7, "cicl": 12.9, "call": 5.4, "tipo": "Estrato medio", "n": 1249, "barrios": [{"name": "Villa Del Rio", "n": 149, "inseg": 54.0}, {"name": "Bosa Porvenir", "n": 103, "inseg": 49.0}, {"name": "Villa Del Río", "n": 41, "inseg": 57.1}, {"name": "Bosa Brasil", "n": 35, "inseg": 56.3}, {"name": "Porvenir", "n": 34, "inseg": 58.1}, {"name": "Parques De Bogotá", "n": 31, "inseg": 47.5}, {"name": "Bosa La Esperanza", "n": 29, "inseg": 54.2}, {"name": "Laureles", "n": 26, "inseg": 55.3}, {"name": "San Antonio", "n": 25, "inseg": 57.5}, {"name": "La Esperanza", "n": 21, "inseg": 57.3}]}, {"id": 7, "name": "Kennedy", "zone": "Occidente", "lat": 4.6273, "lng": -74.1598, "inseg": 54.1, "mujer": 55.5, "hombre": 52.3, "brecha": 3.2, "empeoró": 68.2, "par": 5.2, "puen": 5.0, "cicl": 9.3, "call": 4.4, "tipo": "Estrato medio", "n": 1371, "barrios": [{"name": "Tierra Buena", "n": 86, "inseg": 54.8}, {"name": "Las Margaritas", "n": 80, "inseg": 57.7}, {"name": "Castilla", "n": 70, "inseg": 58.8}, {"name": "Patio Bonito", "n": 47, "inseg": 52.6}, {"name": "Roma", "n": 36, "inseg": 52.0}, {"name": "La Igualdad", "n": 32, "inseg": 58.5}, {"name": "Kennedy Techo", "n": 31, "inseg": 55.0}, {"name": "Kennedy Central", "n": 29, "inseg": 57.7}, {"name": "Britalia", "n": 27, "inseg": 44.5}, {"name": "Nueva York", "n": 26, "inseg": 47.5}]}, {"id": 8, "name": "Fontibon", "zone": "Occidente", "lat": 4.6718, "lng": -74.1492, "inseg": 53.5, "mujer": 55.9, "hombre": 51.6, "brecha": 4.3, "empeoró": 66.4, "par": 4.1, "puen": 4.3, "cicl": 10.8, "call": 4.0, "tipo": "Estrato bajo", "n": 1047, "barrios": [{"name": "Modelia", "n": 166, "inseg": 54.6}, {"name": "La Felicidad", "n": 92, "inseg": 54.8}, {"name": "Salitre", "n": 76, "inseg": 58.5}, {"name": "Hayuelos", "n": 49, "inseg": 51.8}, {"name": "Santa Cecilia", "n": 28, "inseg": 62.1}, {"name": "Bahía Solano", "n": 27, "inseg": 54.5}, {"name": "Zona Franca", "n": 26, "inseg": 50.1}, {"name": "Ciudad Salitre", "n": 22, "inseg": 48.6}, {"name": "Versalles", "n": 22, "inseg": 54.6}, {"name": "Villemar", "n": 21, "inseg": 55.7}]}, {"id": 9, "name": "Engativa", "zone": "Noroccidente", "lat": 4.702, "lng": -74.1163, "inseg": 55.3, "mujer": 57.3, "hombre": 53.2, "brecha": 4.1, "empeoró": 70.4, "par": 4.5, "puen": 3.3, "cicl": 10.1, "call": 4.5, "tipo": "Estrato medio", "n": 1295, "barrios": [{"name": "Normandía", "n": 85, "inseg": 54.6}, {"name": "Santa Cecilia", "n": 63, "inseg": 54.1}, {"name": "Gran Granada", "n": 62, "inseg": 52.8}, {"name": "Estrada", "n": 46, "inseg": 57.4}, {"name": "Bonanza", "n": 43, "inseg": 56.8}, {"name": "La Clarita", "n": 43, "inseg": 54.4}, {"name": "Los Monjes", "n": 42, "inseg": 56.5}, {"name": "El Cortijo", "n": 38, "inseg": 56.3}, {"name": "El Laurel", "n": 37, "inseg": 60.6}, {"name": "Santa Helenita", "n": 34, "inseg": 51.1}]}, {"id": 10, "name": "Suba", "zone": "Norte", "lat": 4.758, "lng": -74.0826, "inseg": 54.1, "mujer": 56.0, "hombre": 52.0, "brecha": 4.0, "empeoró": 68.7, "par": 4.7, "puen": 4.2, "cicl": 10.4, "call": 4.1, "tipo": "Estrato medio", "n": 1413, "barrios": [{"name": "Prado Veraniego", "n": 47, "inseg": 48.4}, {"name": "Bilbao", "n": 37, "inseg": 55.1}, {"name": "La Campiña", "n": 37, "inseg": 56.1}, {"name": "Pasadena", "n": 31, "inseg": 49.5}, {"name": "Suba Rincon", "n": 29, "inseg": 56.5}, {"name": "Pontevedra", "n": 28, "inseg": 57.3}, {"name": "Las Flores", "n": 27, "inseg": 53.2}, {"name": "Compartir", "n": 26, "inseg": 55.3}, {"name": "Britalia Norte", "n": 25, "inseg": 53.4}, {"name": "Lombardia", "n": 22, "inseg": 53.1}]}, {"id": 11, "name": "Barrios Unidos", "zone": "Centro-Norte", "lat": 4.68, "lng": -74.0817, "inseg": 54.4, "mujer": 55.8, "hombre": 53.0, "brecha": 2.8, "empeoró": 67.1, "par": 5.7, "puen": 3.7, "cicl": 12.1, "call": 3.8, "tipo": "Estrato medio", "n": 912, "barrios": [{"name": "Modelo Norte", "n": 114, "inseg": 55.4}, {"name": "Simón Bolivar", "n": 110, "inseg": 57.2}, {"name": "San Fernando", "n": 81, "inseg": 52.8}, {"name": "Colombia", "n": 54, "inseg": 55.1}, {"name": "Rionegro", "n": 53, "inseg": 53.6}, {"name": "La Castellana", "n": 32, "inseg": 55.3}, {"name": "Andes", "n": 31, "inseg": 51.7}, {"name": "Muequeta", "n": 29, "inseg": 53.0}, {"name": "Modelo", "n": 25, "inseg": 56.1}, {"name": "Simon Bolivar", "n": 22, "inseg": 54.7}]}, {"id": 12, "name": "Teusaquillo", "zone": "Centro", "lat": 4.6509, "lng": -74.0939, "inseg": 53.6, "mujer": 55.9, "hombre": 51.5, "brecha": 4.4, "empeoró": 66.9, "par": 6.1, "puen": 4.2, "cicl": 14.3, "call": 4.1, "tipo": "Estrato bajo", "n": 988, "barrios": [{"name": "Nicolás De Federman", "n": 178, "inseg": 55.0}, {"name": "El Salitre", "n": 88, "inseg": 49.0}, {"name": "Salitre", "n": 66, "inseg": 55.2}, {"name": "Ciudad Salitre", "n": 54, "inseg": 51.3}, {"name": "Salitre Oriental", "n": 54, "inseg": 54.4}, {"name": "San Luis", "n": 35, "inseg": 62.1}, {"name": "Quirinal", "n": 32, "inseg": 54.2}, {"name": "Quinta Paredes", "n": 30, "inseg": 54.6}, {"name": "Gran América", "n": 28, "inseg": 54.9}, {"name": "Chapinero", "n": 25, "inseg": 48.1}]}, {"id": 13, "name": "Los Martires", "zone": "Centro", "lat": 4.6074, "lng": -74.0956, "inseg": 0.0, "mujer": 0.0, "hombre": 0.0, "brecha": 0.0, "empeoró": 0, "par": 0.0, "puen": 0.0, "cicl": 0.0, "call": 0.0, "tipo": "N/D", "n": 0, "barrios": []}, {"id": 14, "name": "Antonio Nariño", "zone": "Suroriente", "lat": 4.5877, "lng": -74.1069, "inseg": 55.0, "mujer": 56.6, "hombre": 53.7, "brecha": 2.9, "empeoró": 70.1, "par": 5.3, "puen": 5.0, "cicl": 16.7, "call": 3.8, "tipo": "Estrato medio", "n": 923, "barrios": [{"name": "Restrepo", "n": 333, "inseg": 54.7}, {"name": "Policarpa", "n": 114, "inseg": 56.3}, {"name": "Ciudad Jardín Sur", "n": 77, "inseg": 56.1}, {"name": "Ciudad Berna", "n": 60, "inseg": 56.3}, {"name": "Villa Mayor", "n": 47, "inseg": 52.6}, {"name": "Ciudad Jardín", "n": 43, "inseg": 61.5}, {"name": "Villa Mayor Antiguo", "n": 38, "inseg": 54.6}, {"name": "Villamayor Antigua", "n": 33, "inseg": 54.7}, {"name": "Santander", "n": 31, "inseg": 48.4}, {"name": "San Jorge Central", "n": 26, "inseg": 54.0}]}, {"id": 15, "name": "Puente Aranda", "zone": "Occidente", "lat": 4.6273, "lng": -74.1152, "inseg": 55.4, "mujer": 56.4, "hombre": 54.5, "brecha": 1.9, "empeoró": 70.2, "par": 5.4, "puen": 4.8, "cicl": 12.2, "call": 3.8, "tipo": "Estrato medio", "n": 920, "barrios": [{"name": "San Rafael", "n": 89, "inseg": 56.3}, {"name": "Primavera", "n": 65, "inseg": 52.4}, {"name": "Tibana", "n": 63, "inseg": 54.1}, {"name": "Galan", "n": 49, "inseg": 55.9}, {"name": "Galán", "n": 43, "inseg": 57.6}, {"name": "Santa Rita", "n": 41, "inseg": 53.0}, {"name": "San Eusebio", "n": 37, "inseg": 56.0}, {"name": "Asunción", "n": 35, "inseg": 56.3}, {"name": "Jazmin", "n": 34, "inseg": 63.0}, {"name": "Villa Ines", "n": 34, "inseg": 53.1}]}, {"id": 16, "name": "La Candelaria", "zone": "Centro", "lat": 4.5951, "lng": -74.0757, "inseg": 48.7, "mujer": 50.2, "hombre": 47.2, "brecha": 3.0, "empeoró": 54.3, "par": 4.2, "puen": 4.9, "cicl": 12.5, "call": 5.3, "tipo": "Estrato medio", "n": 840, "barrios": [{"name": "Candelaria", "n": 160, "inseg": 47.1}, {"name": "Belén", "n": 104, "inseg": 44.3}, {"name": "La Candelaria", "n": 72, "inseg": 47.7}, {"name": "Belen", "n": 51, "inseg": 51.7}, {"name": "Concordia", "n": 45, "inseg": 49.0}, {"name": "Santabarbara", "n": 34, "inseg": 49.1}, {"name": "Egipto", "n": 33, "inseg": 42.4}, {"name": "Las Aguas", "n": 28, "inseg": 48.9}, {"name": "Guavio", "n": 26, "inseg": 47.4}, {"name": "Aguas", "n": 24, "inseg": 50.0}]}, {"id": 17, "name": "Rafael Uribe Uribe", "zone": "Sur", "lat": 4.548, "lng": -74.1168, "inseg": 53.6, "mujer": 55.1, "hombre": 51.6, "brecha": 3.5, "empeoró": 66.2, "par": 3.7, "puen": 6.2, "cicl": 19.1, "call": 5.5, "tipo": "Estrato medio", "n": 975, "barrios": [{"name": "Diana Turbay", "n": 52, "inseg": 52.0}, {"name": "Bravo Paez", "n": 44, "inseg": 55.4}, {"name": "Gustavo Restrepo", "n": 36, "inseg": 55.7}, {"name": "Centenario", "n": 36, "inseg": 54.7}, {"name": "Ingles", "n": 33, "inseg": 51.7}, {"name": "Bosque De San Carlos", "n": 31, "inseg": 60.5}, {"name": "Villa Mayor", "n": 31, "inseg": 51.6}, {"name": "Molinos", "n": 29, "inseg": 50.7}, {"name": "El Triunfo", "n": 29, "inseg": 50.7}, {"name": "Marruecos", "n": 27, "inseg": 54.4}]}, {"id": 18, "name": "Ciudad Bolivar", "zone": "Sur", "lat": 4.4968, "lng": -74.1571, "inseg": 49.4, "mujer": 49.9, "hombre": 48.6, "brecha": 1.3, "empeoró": 59.3, "par": 3.4, "puen": 4.7, "cicl": 17.1, "call": 6.2, "tipo": "Estrato medio", "n": 1002, "barrios": [{"name": "Madelena", "n": 136, "inseg": 48.1}, {"name": "Paraíso", "n": 62, "inseg": 46.8}, {"name": "Alameda", "n": 31, "inseg": 55.0}, {"name": "Lucero Bajo", "n": 26, "inseg": 55.3}, {"name": "Jerusalén", "n": 23, "inseg": 55.2}, {"name": "El Eden", "n": 22, "inseg": 48.5}, {"name": "Perdomo", "n": 21, "inseg": 54.1}, {"name": "S.C El Mochuelo Ii", "n": 21, "inseg": 52.4}, {"name": "El Ensueño", "n": 19, "inseg": 50.9}, {"name": "Casa De Teja", "n": 17, "inseg": 53.0}]}, {"id": 19, "name": "Sumapaz", "zone": "Sur rural", "lat": 4.31, "lng": -74.195, "inseg": 57.6, "mujer": 53.7, "hombre": 65.3, "brecha": -11.6, "empeoró": 65.2, "par": 0.0, "puen": 0.0, "cicl": 0.0, "call": 0.0, "tipo": "Estrato bajo", "n": 69, "barrios": [{"name": "Nazareth", "n": 24, "inseg": 47.2}, {"name": "La Union", "n": 17, "inseg": 66.8}, {"name": "San Juan", "n": 11, "inseg": 63.7}, {"name": "Betania", "n": 9, "inseg": 40.8}, {"name": "Nueva Granada", "n": 8, "inseg": 79.4}]}];
+const ALL_EDGES = {
+  vecino: [[0, 1, 0.9], [0, 10, 0.85], [1, 2, 0.85], [1, 11, 0.8], [1, 12, 0.75], [2, 12, 0.7], [2, 16, 0.9], [2, 13, 0.75], [3, 14, 0.85], [3, 17, 0.8], [3, 2, 0.65], [4, 5, 0.75], [4, 17, 0.7], [4, 19, 0.6], [5, 6, 0.7], [5, 17, 0.8], [6, 7, 0.85], [6, 18, 0.8], [7, 8, 0.75], [7, 15, 0.8], [7, 5, 0.7], [8, 9, 0.8], [8, 15, 0.7], [9, 10, 0.75], [9, 11, 0.7], [10, 11, 0.65], [11, 12, 0.8], [12, 15, 0.7], [12, 13, 0.75], [13, 16, 0.85], [13, 14, 0.7], [14, 17, 0.75], [15, 13, 0.65], [16, 2, 0.9], [17, 18, 0.7], [18, 6, 0.75]],
+  ruta:   [[10, 0, 0.95], [0, 1, 0.9], [1, 11, 0.85], [11, 12, 0.88], [12, 13, 0.9], [13, 16, 0.95], [16, 2, 0.9], [9, 8, 0.82], [8, 7, 0.88], [7, 6, 0.9], [6, 18, 0.85], [3, 14, 0.82], [14, 13, 0.88], [17, 5, 0.82], [5, 4, 0.78], [15, 13, 0.78], [9, 11, 0.8]],
+  sim:    [[1, 2, 0.98], [1, 3, 0.95], [1, 4, 0.95], [1, 5, 0.98], [1, 6, 0.98], [1, 7, 0.99], [1, 8, 0.98], [1, 9, 0.98], [1, 10, 0.99], [1, 11, 0.99], [1, 12, 0.99], [1, 14, 0.98], [1, 15, 0.99], [1, 16, 0.98], [1, 17, 0.95], [1, 18, 0.94], [2, 3, 0.99], [2, 4, 0.98], [2, 5, 0.98], [2, 6, 0.99], [2, 7, 0.98], [2, 8, 0.98], [2, 9, 0.95], [2, 10, 0.97], [2, 11, 0.96], [2, 12, 0.96], [2, 14, 0.97], [2, 15, 0.98], [2, 16, 0.98], [2, 17, 0.97], [2, 18, 0.96], [3, 4, 1.0], [3, 5, 0.98], [3, 6, 0.98], [3, 7, 0.96], [3, 8, 0.97], [3, 9, 0.95], [3, 10, 0.96], [3, 11, 0.94], [3, 12, 0.95], [3, 14, 0.98], [3, 15, 0.96], [3, 16, 0.98], [3, 17, 1.0], [3, 18, 0.98], [4, 5, 0.99], [4, 6, 0.99], [4, 7, 0.96], [4, 8, 0.97], [4, 9, 0.95], [4, 10, 0.96], [4, 11, 0.94], [4, 12, 0.95], [4, 14, 0.97], [4, 15, 0.96], [4, 16, 0.99], [4, 17, 1.0], [4, 18, 0.99], [5, 6, 0.99], [5, 7, 0.98], [5, 8, 0.99], [5, 9, 0.98], [5, 10, 0.98], [5, 11, 0.98], [5, 12, 0.99], [5, 14, 0.99], [5, 15, 0.99], [5, 16, 0.99], [5, 17, 0.99], [5, 18, 0.98], [6, 7, 0.99], [6, 8, 0.99], [6, 9, 0.98], [6, 10, 0.99], [6, 11, 0.98], [6, 12, 0.98], [6, 14, 0.98], [6, 15, 0.99], [6, 16, 1.0], [6, 17, 0.98], [6, 18, 0.98], [7, 8, 0.99], [7, 9, 0.99], [7, 10, 1.0], [7, 11, 0.99], [7, 12, 0.98], [7, 14, 0.98], [7, 15, 0.99], [7, 16, 0.98], [7, 17, 0.95], [7, 18, 0.95], [8, 9, 0.99], [8, 10, 1.0], [8, 11, 0.99], [8, 12, 0.99], [8, 14, 0.99], [8, 15, 0.99], [8, 16, 0.99], [8, 17, 0.97], [8, 18, 0.97], [9, 10, 1.0], [9, 11, 0.99], [9, 12, 0.98], [9, 14, 0.97], [9, 15, 0.99], [9, 16, 0.98], [9, 17, 0.95], [9, 18, 0.96], [10, 11, 0.99], [10, 12, 0.99], [10, 14, 0.98], [10, 15, 1.0], [10, 16, 0.99], [10, 17, 0.96], [10, 18, 0.96], [11, 12, 1.0], [11, 14, 0.99], [11, 15, 1.0], [11, 16, 0.97], [11, 17, 0.95], [11, 18, 0.94], [12, 14, 0.99], [12, 15, 1.0], [12, 16, 0.98], [12, 17, 0.96], [12, 18, 0.95], [14, 15, 0.99], [14, 16, 0.98], [14, 17, 0.98], [14, 18, 0.96], [15, 16, 0.98], [15, 17, 0.96], [15, 18, 0.95], [16, 17, 0.98], [16, 18, 0.99], [17, 18, 0.99]],
+  brecha: [],
+};
+
+const nodeMap = {};
+NODES.forEach(n => nodeMap[n.id] = n);
+
+let vmode      = 'inseg';
+let activeEdges= new Set(['vecino']);
+let selected   = null;
+let showLabels = true;
+
+// ── Mapa base ──────────────────────────────────────────────
+const map = L.map('map', {
+  center: [4.6097, -74.0817],
+  zoom: 11,
+  zoomControl: true,
+  attributionControl: false,
+});
+
+const TILES = {
+  dark:      ['https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+               '© CartoDB'],
+  streets:   ['https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+               '© OpenStreetMap'],
+  satellite: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+               '© Esri'],
+  topo:      ['https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+               '© OpenTopoMap'],
+};
+
+let tileLayer = L.tileLayer(TILES.dark[0]).addTo(map);
+
+function changeTile(key) {
+  map.removeLayer(tileLayer);
+  tileLayer = L.tileLayer(TILES[key][0]).addTo(map);
+}
+
+// ── Canvas overlay ─────────────────────────────────────────
+const canvas = document.getElementById('graph-canvas');
+const ctx    = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const wrap = document.getElementById('map-wrap');
+  canvas.width  = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  redrawCanvas();
+}
+
+function latLngToCanvas(lat, lng) {
+  const pt = map.latLngToContainerPoint([lat, lng]);
+  return {x: pt.x, y: pt.y};
+}
+
+function scoreVal(n) {
+  if (vmode==='mujer')   return n.mujer;
+  if (vmode==='hombre')  return n.hombre;
+  if (vmode==='brecha')  return Math.max(n.brecha, 0);
+  if (vmode==='empeoró') return n['empeoró'];
+  return n.inseg;
+}
+
+function scoreColor(v, a=1) {
+  const t = Math.max(0, Math.min(1, (v-10)/75));
+  let r,g,b;
+  if (t < 0.5) {
+    const u=t*2; r=Math.round(29+u*196); g=Math.round(158+u*9); b=Math.round(117-u*94);
+  } else {
+    const u=(t-.5)*2; r=Math.round(225+u*2); g=Math.round(167-u*141); b=23;
+  }
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function nodeRadius(n) {
+  const v = scoreVal(n);
+  return 8 + (v/100) * 18;
+}
+
+function redrawCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Construir set de vecinos del seleccionado
+  const allEdges = [];
+  activeEdges.forEach(key => {
+    (ALL_EDGES[key]||[]).forEach(e => allEdges.push({...{a:e[0],b:e[1],w:e[2],type:key}}) );
+  });
+
+  const neighSet = selected !== null
+    ? new Set(allEdges.filter(e=>e.a===selected||e.b===selected).flatMap(e=>[e.a,e.b]))
+    : null;
+
+  // Dibujar aristas
+  allEdges.forEach(e => {
+    const na = nodeMap[e.a], nb = nodeMap[e.b];
+    if (!na || !nb) return;
+    const pa = latLngToCanvas(na.lat, na.lng);
+    const pb = latLngToCanvas(nb.lat, nb.lng);
+    const conn = neighSet && (e.a===selected || e.b===selected);
+    const alpha = neighSet ? (conn ? 1 : 0.05) : 0.55;
+    const isRed = e.type==='ruta' || e.type==='brecha';
+    const col = isRed
+      ? `rgba(226,75,74,${(0.2+e.w*.55)*alpha})`
+      : `rgba(90,110,130,${(0.15+e.w*.45)*alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    if (e.type==='ruta') {
+      const mx=(pa.x+pb.x)/2, my=(pa.y+pb.y)/2-14;
+      ctx.quadraticCurveTo(mx, my, pb.x, pb.y);
+    } else {
+      ctx.lineTo(pb.x, pb.y);
+    }
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = 0.5 + e.w * 2.8;
+    ctx.stroke();
+    if (conn) {
+      ctx.fillStyle = `rgba(200,205,215,${alpha*.85})`;
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(Math.round(e.w*100), (pa.x+pb.x)/2, (pa.y+pb.y)/2 - 5);
+    }
+  });
+
+  // Dibujar nodos
+  NODES.forEach(n => {
+    const p = latLngToCanvas(n.lat, n.lng);
+    const r = nodeRadius(n);
+    const v = scoreVal(n);
+    const isSel = n.id === selected;
+    const isN   = neighSet && neighSet.has(n.id) && n.id !== selected;
+    const dim   = selected !== null && !isSel && !isN;
+    const al    = dim ? 0.15 : 0.92;
+
+    // Sombra/halo para nodos sobre el mapa
+    if (!dim) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r+4, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(0,0,0,${isSel?0.6:0.35})`;
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+    ctx.fillStyle = scoreColor(v, al);
+    ctx.fill();
+
+    if (isSel) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r+5, 0, Math.PI*2);
+      ctx.strokeStyle = scoreColor(v, 0.9);
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+
+    if (showLabels && !dim) {
+      const fs = Math.max(9, r*.48);
+      const short = n.name.split(' ')[0];
+      ctx.font = `${isSel?'600 ':''}${fs}px 'Segoe UI',sans-serif`;
+      ctx.fillStyle = `rgba(255,255,255,${al})`;
+      ctx.textAlign = 'center';
+      ctx.fillText(short, p.x, p.y + r + 12);
+      ctx.font = `500 ${Math.max(8,r*.42)}px sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,.82)';
+      const lbl = vmode==='brecha'
+        ? (n.brecha>=0?'+':'')+Math.round(n.brecha)+'pp'
+        : Math.round(v)+'%';
+      ctx.fillText(lbl, p.x, p.y+4);
+    }
+  });
+}
+
+// ── Eventos del mapa ───────────────────────────────────────
+map.on('move zoom moveend zoomend', redrawCanvas);
+window.addEventListener('resize', resizeCanvas);
+
+// ── Click sobre canvas ─────────────────────────────────────
+canvas.style.pointerEvents = 'auto';
+canvas.style.cursor = 'crosshair';
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  let found = null;
+  for (const n of NODES) {
+    const p = latLngToCanvas(n.lat, n.lng);
+    const r = nodeRadius(n) + 6;
+    if ((mx-p.x)**2 + (my-p.y)**2 < r**2) { found = n.id; break; }
+  }
+  canvas.style.cursor = found !== null ? 'pointer' : 'crosshair';
+});
+
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  let found = null;
+  for (const n of NODES) {
+    const p = latLngToCanvas(n.lat, n.lng);
+    const r = nodeRadius(n) + 6;
+    if ((mx-p.x)**2 + (my-p.y)**2 < r**2) { found = n.id; break; }
+  }
+  if (found !== null) {
+    selected = found === selected ? null : found;
+    showDetail(selected);
+    redrawCanvas();
+    if (selected !== null) {
+      const n = nodeMap[selected];
+      map.panTo([n.lat, n.lng], {animate:true, duration:0.5});
+    }
+  }
+});
+
+// ── Panel lateral ──────────────────────────────────────────
+function showDetail(id) {
+  document.getElementById('emp').style.display  = id===null?'':'none';
+  document.getElementById('det').style.display  = id===null?'none':'';
+  if (id===null) { document.getElementById('ph-t').textContent='Selecciona una localidad'; return; }
+  const n = nodeMap[id];
+  document.getElementById('ph-t').textContent   = n.name;
+  document.getElementById('d-name').textContent = n.name;
+  document.getElementById('d-sub').textContent  = 'Zona: '+n.zone+' · '+n.n+' encuestados';
+
+  const bd = document.getElementById('d-badges'); bd.innerHTML='';
+  if (n.inseg>=60) bd.innerHTML+='<span class="badge br">Alta victimización</span>';
+  else if (n.inseg>=35) bd.innerHTML+='<span class="badge ba">Victimización media</span>';
+  else bd.innerHTML+='<span class="badge bg">Baja victimización</span>';
+  if (n.brecha>=20) bd.innerHTML+='<span class="badge bp">Brecha crítica</span>';
+  else if (n.brecha>=10) bd.innerHTML+='<span class="badge bp">Brecha alta</span>';
+
+  document.getElementById('d-ins').textContent = n.inseg+'%';
+  document.getElementById('b-ins').style.width = n.inseg+'%';
+  document.getElementById('d-emp').textContent = n['empeoró']+'%';
+
+  document.getElementById('d-m').textContent = n.mujer+'%';
+  document.getElementById('b-m').style.width = n.mujer+'%';
+  document.getElementById('d-h').textContent = n.hombre+'%';
+  document.getElementById('b-h').style.width = n.hombre+'%';
+  const dbr = document.getElementById('d-br');
+  dbr.textContent = (n.brecha>=0?'+':'')+n.brecha+' pp';
+  dbr.style.color = n.brecha>=20?'#F48A8A':n.brecha>=10?'#F0A854':'#56D364';
+
+  const spaceFn  = v => v>0 ? v.toFixed(1)+'/5' : 'N/D';
+  const spacePct = v => v>0 ? Math.min(100,(v/5)*100) : 0;
+  document.getElementById('d-par').textContent  = spaceFn(n.par);
+  document.getElementById('b-par').style.width  = spacePct(n.par)+'%';
+  document.getElementById('d-puen').textContent = spaceFn(n.puen);
+  document.getElementById('b-puen').style.width = spacePct(n.puen)+'%';
+  document.getElementById('d-cicl').textContent = spaceFn(n.cicl);
+  document.getElementById('b-cicl').style.width = spacePct(n.cicl)+'%';
+  document.getElementById('d-call').textContent = spaceFn(n.call);
+  document.getElementById('b-call').style.width = spacePct(n.call)+'%';
+
+  // Barrios
+  const bc = document.getElementById('d-barrios');
+  if (n.barrios && n.barrios.length>0) {
+    const mx = Math.max(...n.barrios.map(b=>b.inseg));
+    bc.innerHTML = n.barrios.slice(0,7).map(b=>{
+      const col = b.inseg>60?'#E24B4A':b.inseg>35?'#EF9F27':'#1D9E75';
+      const pct = mx>0 ? (b.inseg/mx*100).toFixed(1) : 50;
+      return `<div class="bcard">
+        <div class="bcard-name">${b.name}</div>
+        <div class="bcard-sub">Victimización: ${b.inseg.toFixed(1)}% · n=${b.n}</div>
+        <div class="bbar"><div class="bbf" style="width:${pct}%;background:${col}"></div></div>
+      </div>`;
+    }).join('');
+  } else bc.innerHTML='<div style="font-size:11px;color:#484F58">Sin datos de barrios</div>';
+
+  // Vecinos
+  const allEdges=[];
+  activeEdges.forEach(k=>{(ALL_EDGES[k]||[]).forEach(e=>allEdges.push([e[0],e[1],e[2]]));}  );
+  const ne = allEdges.filter(e=>e[0]===id||e[1]===id);
+  document.getElementById('d-neigh').innerHTML = ne.map(e=>{
+    const ni = e[0]===id?e[1]:e[0];
+    const nn = nodeMap[ni];
+    const sv = scoreVal(nn);
+    return `<span style="display:inline-flex;align-items:center;gap:3px;margin:1px 5px 1px 0;font-size:10px">
+      <span style="width:6px;height:6px;border-radius:50%;background:${scoreColor(sv,1)};display:inline-block"></span>
+      ${nn.name.split(' ')[0]} <span style="color:#484F58">${Math.round(e[2]*100)}</span>
+    </span>`;
+  }).join('');
+}
+
+// ── Controles ─────────────────────────────────────────────
+function setView(v, btn) {
+  vmode = v;
+  document.querySelectorAll('#top .tb').forEach(b=>{
+    if(['inseg','mujer','hombre','brecha','empeoró'].includes(b.onclick?.toString().match(/'(\w+)'/)?.[1]))
+      b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  redrawCanvas();
+  if (selected!==null) showDetail(selected);
+}
+
+function toggleEdge(key, btn) {
+  if (activeEdges.has(key)) { activeEdges.delete(key); btn.classList.remove('active'); }
+  else                      { activeEdges.add(key);    btn.classList.add('active');    }
+  redrawCanvas();
+  if (selected!==null) showDetail(selected);
+}
+
+setTimeout(resizeCanvas, 200);
+</script>
+</body>
+</html>
